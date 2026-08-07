@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand name — deliberately identical in every locale, never translated. -->
+    <string name="app_name" translatable="false">Saarthi AI</string>
+</resources>

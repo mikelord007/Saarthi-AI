@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#F3F2F2</color>
+
+    <!-- Design system ground — see ui/theme/SaarthiColors.kt. Kept in sync
+         manually; used only where a resource-level color is required (the
+         window background, so there's no white flash before Compose draws)
+         rather than the Kotlin token, which Compose code should use. -->
+    <color name="saarthi_bg">#F3F2F2</color>
+</resources>
