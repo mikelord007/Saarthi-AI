@@ -21,3 +21,12 @@ sealed interface Screen {
     data class ThreadDetail(val chatId: String) : Screen
     data object Settings : Screen
 }
+
+/** [AssistActivity]'s own two-member hierarchy — see the class doc on [Screen]. */
+sealed interface OverlayScreen {
+    data object Assist : OverlayScreen
+    data class Handback(
+        val actionLabel: String,
+        val spokenReason: String,
+    ) : OverlayScreen
+}

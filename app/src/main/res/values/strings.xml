@@ -9,6 +9,8 @@
     <string name="cd_history">History</string>
     <string name="cd_settings">Settings</string>
     <string name="cd_speak">Speak</string>
+    <string name="cd_close">Close</string>
+    <string name="stop_label">Stop</string>
     <string name="step_of">Step %1$d of %2$d</string>
     <string name="continue_label">Continue</string>
     <string name="not_now">Not now</string>
@@ -123,4 +125,12 @@
     <string name="promise_body_you">you</string>
     <string name="promise_body_suffix"> make the last tap.</string>
     <string name="promise_cta">I understand — let\'s go</string>
+
+    <!-- Hand-back -->
+    <string name="handback_kicker">I\'m stopping here</string>
+    <string name="handback_action_question">%1$s?</string>
+    <string name="handback_body">I was about to do this on your behalf. You\'ll need to complete it yourself.</string>
+    <string name="handback_footer">This one is yours to make. I won\'t tap it for you.</string>
+    <string name="handback_confirm_label">Yes — I\'ll do it myself</string>
+    <string name="handback_decline_label">No, stop</string>
 </resources>
