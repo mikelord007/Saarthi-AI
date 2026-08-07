@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Metadata for SaarthiRecognitionService (android.speech). Required to exist
+  by the VoiceInteractionService contract's recognitionService reference —
+  see that class's doc.
+-->
+<recognition-service xmlns:android="http://schemas.android.com/apk/res/android" />

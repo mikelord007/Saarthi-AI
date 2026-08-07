@@ -32,6 +32,45 @@
             </intent-filter>
         </activity>
 
+        <!--
+          The default-assistant entry point: long-press home / the gesture-nav
+          assist swipe arrives here as a voice-interaction session request, not
+          an activity launch. See SaarthiInteractionSession's doc for how this
+          relates to AssistActivity's separate ASSIST-intent entry point above.
+        -->
+        <service
+            android:name=".ui.SaarthiInteractionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/interaction_service" />
+        </service>
+
+        <service
+            android:name=".ui.SaarthiInteractionSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+
+        <!--
+          Required to exist by the interaction service's recognitionService
+          reference above; see that class's doc.
+        -->
+        <service
+            android:name=".ui.SaarthiRecognitionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_RECOGNITION">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition_service" />
+        </service>
+
     </application>
 
 </manifest>

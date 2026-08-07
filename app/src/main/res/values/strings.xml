@@ -133,4 +133,15 @@
     <string name="handback_footer">This one is yours to make. I won\'t tap it for you.</string>
     <string name="handback_confirm_label">Yes — I\'ll do it myself</string>
     <string name="handback_decline_label">No, stop</string>
+
+    <!-- Invoke sheet (system assistant-slot entry point) -->
+    <string name="invoke_listening_title">I\'m listening.</string>
+    <string name="invoke_listening_prompt">Say what you want, in %1$s.</string>
+    <string name="invoke_read_screen_button">Read this screen aloud</string>
+    <string name="invoke_do_task_button">Do a task for me</string>
+    <string name="invoke_hold_home_hint">Hold home any time</string>
+    <string name="invoke_heard_you">Heard you</string>
+    <string name="invoke_heard_promise">I stop before paying — you make the last tap.</string>
+    <string name="invoke_confirm_button">Yes, go ahead</string>
+    <string name="invoke_retry_button">No, let me say it again</string>
 </resources>
