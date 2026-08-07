@@ -2,4 +2,23 @@
 <resources>
     <!-- Brand name — deliberately identical in every locale, never translated. -->
     <string name="app_name" translatable="false">Saarthi AI</string>
+
+    <!-- Shared -->
+    <string name="cd_send">Send</string>
+    <string name="cd_history">History</string>
+    <string name="cd_settings">Settings</string>
+    <string name="cd_speak">Speak</string>
+
+    <!-- Home -->
+    <string name="home_title">What should I do\nfor you?</string>
+    <string name="home_caption_listening">Listening…</string>
+    <string name="home_caption_transcribing">Transcribing…</string>
+    <string name="home_caption_thinking">Thinking…</string>
+    <string name="home_caption_tap_and_speak">Tap and speak · %1$s</string>
+    <string name="suggestion_search_weather">Search for weather in Chrome</string>
+    <string name="suggestion_read_screen">Read this screen to me</string>
+    <string name="suggestion_search_cricket">Check the cricket score in Chrome</string>
+    <string name="home_text_placeholder">or type it instead</string>
+    <string name="earlier_today">Earlier today</string>
+    <string name="all">All</string>
 </resources>
