@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Brand name — deliberately identical in every locale, never translated. -->
     <string name="app_name" translatable="false">Saarthi AI</string>
 
@@ -77,4 +77,50 @@
     <string name="conversation_title">Conversation</string>
     <string name="conversation_gone">This conversation is gone.</string>
     <string name="you_label">You</string>
+
+    <!-- Onboarding: Welcome -->
+    <string name="welcome_kicker">Hold on. I\'ll walk you through.</string>
+    <string name="welcome_body">Tell me what you want to do, in your language. I read the screen aloud, or I do the tapping for you — and I say every step before I take it.</string>
+    <string name="begin">Begin</string>
+    <string name="welcome_footer">Takes about a minute · four permissions</string>
+
+    <!-- Onboarding: Language -->
+    <string name="language_screen_title">Which language should I speak?</string>
+    <string name="language_screen_body">I\'ll listen in this language too. Change it any time in settings.</string>
+    <string name="language_screen_count" tools:ignore="PluralsCandidate">%1$d languages · more coming</string>
+
+    <!-- Onboarding: Voice -->
+    <string name="voice_screen_title">Whose voice should I use?</string>
+    <string name="voice_screen_body">Tap one to hear it read a line back to you.</string>
+    <string name="onboarding_voice_sample_line">I found Ola. Opening it now.</string>
+    <string name="use_this_voice">Use this voice</string>
+
+    <!-- Onboarding: Mic -->
+    <string name="mic_screen_title">May I use the microphone?</string>
+    <string name="mic_screen_body">Only while you are talking to me. I don\'t listen in the background, and nothing is recorded after the task ends.</string>
+    <string name="mic_screen_note_prefix">Android will ask you next. Choose </string>
+    <string name="mic_screen_note_highlight">\"While using the app\".</string>
+    <string name="allow_microphone">Allow microphone</string>
+
+    <!-- Onboarding: Accessibility -->
+    <string name="a11y_screen_title">Let me read the screen</string>
+    <string name="a11y_screen_body">This is an accessibility service. It reads the labels on your screen — never pictures, never your keyboard.</string>
+    <string name="a11y_row_1">Reads button and text labels</string>
+    <string name="a11y_row_2">Taps and types on your behalf</string>
+    <string name="a11y_row_3">Never takes screenshots or photos</string>
+    <string name="open_android_settings">Open Android settings</string>
+    <string name="a11y_settings_path">Settings → Accessibility → Saarthi AI → On</string>
+
+    <!-- Onboarding: Assistant -->
+    <string name="assistant_screen_title">Hold the home button for me</string>
+    <string name="assistant_screen_body">Make Saarthi AI your assistant, and a long press on home brings me up over whatever you\'re doing.</string>
+    <string name="set_as_assistant">Set as assistant</string>
+
+    <!-- Onboarding: Promise -->
+    <string name="my_promise">My promise</string>
+    <string name="promise_headline">I never spend your money.</string>
+    <string name="promise_body_prefix">I can open apps, fill forms and choose your ride. But before any payment, any send, any confirm — I stop, I say out loud what is about to happen, and </string>
+    <string name="promise_body_you">you</string>
+    <string name="promise_body_suffix"> make the last tap.</string>
+    <string name="promise_cta">I understand — let\'s go</string>
 </resources>

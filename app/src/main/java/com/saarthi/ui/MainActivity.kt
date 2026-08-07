@@ -11,14 +11,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.saarthi.chat.ChatEntry
@@ -34,6 +29,13 @@ import com.saarthi.ui.screens.HistoryScreen
 import com.saarthi.ui.screens.HomeScreen
 import com.saarthi.ui.screens.SettingsScreen
 import com.saarthi.ui.screens.ThreadDetailScreen
+import com.saarthi.ui.screens.onboarding.AccessibilityScreen
+import com.saarthi.ui.screens.onboarding.AssistantScreen
+import com.saarthi.ui.screens.onboarding.LanguageScreen
+import com.saarthi.ui.screens.onboarding.MicScreen
+import com.saarthi.ui.screens.onboarding.PromiseScreen
+import com.saarthi.ui.screens.onboarding.VoiceScreen
+import com.saarthi.ui.screens.onboarding.WelcomeScreen
 import com.saarthi.ui.theme.SaarthiTheme
 import java.util.UUID
 import kotlinx.coroutines.launch
@@ -98,18 +100,41 @@ class MainActivity : ComponentActivity() {
 
                 when (val screen = nav.current) {
                     // --- Onboarding: welcome -> language -> voice -> mic -> a11y -> assistant -> promise -> home ---
-                    // Wired up in a later commit.
-                    Screen.Welcome, Screen.Language, Screen.Voice, Screen.MicPermission,
-                    Screen.AccessibilityPermission, Screen.AssistantPermission, Screen.Promise -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            androidx.compose.material3.TextButton(onClick = {
-                                onboardingPreferences.isComplete = true
-                                nav.reset(Screen.Home)
-                            }) {
-                                Text("Coming soon — tap to skip to Home")
-                            }
-                        }
-                    }
+                    Screen.Welcome -> WelcomeScreen(onBegin = { nav.go(Screen.Language) })
+                    Screen.Language -> LanguageScreen(
+                        languages = SupportedLanguages.ALL,
+                        selected = selectedLanguage,
+                        onSelected = ::onLanguageSelected,
+                        onContinue = { nav.go(Screen.Voice) },
+                        onBack = nav::back,
+                    )
+                    Screen.Voice -> VoiceScreen(
+                        speakers = Speakers.ALL,
+                        selected = selectedSpeaker,
+                        onSelected = ::onSpeakerSelected,
+                        onContinue = { nav.go(Screen.MicPermission) },
+                        onBack = nav::back,
+                    )
+                    Screen.MicPermission -> MicScreen(
+                        onAllow = { requestMicPermissionOnboarding.launch(Manifest.permission.RECORD_AUDIO); nav.go(Screen.AccessibilityPermission) },
+                        onNotNow = { nav.go(Screen.AccessibilityPermission) },
+                        onBack = nav::back,
+                    )
+                    Screen.AccessibilityPermission -> AccessibilityScreen(
+                        onOpenSettings = { openAccessibilitySettings(); nav.go(Screen.AssistantPermission) },
+                        onBack = nav::back,
+                    )
+                    Screen.AssistantPermission -> AssistantScreen(
+                        onSetAsAssistant = { openAssistantSettings(); nav.go(Screen.Promise) },
+                        onNotNow = { nav.go(Screen.Promise) },
+                        onBack = nav::back,
+                    )
+                    Screen.Promise -> PromiseScreen(
+                        onUnderstood = {
+                            onboardingPreferences.isComplete = true
+                            nav.reset(Screen.Home)
+                        },
+                    )
 
                     // --- Everyday use ---
                     Screen.Home -> HomeScreen(
