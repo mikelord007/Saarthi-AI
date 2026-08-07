@@ -4,10 +4,22 @@
     <string name="app_name" translatable="false">Saarthi AI</string>
 
     <!-- Shared -->
+    <string name="back">Back</string>
     <string name="cd_send">Send</string>
     <string name="cd_history">History</string>
     <string name="cd_settings">Settings</string>
     <string name="cd_speak">Speak</string>
+    <string name="step_of">Step %1$d of %2$d</string>
+    <string name="continue_label">Continue</string>
+    <string name="not_now">Not now</string>
+    <string name="yesterday">Yesterday</string>
+
+    <!-- Voice-state mark labels (assist overlay, invoke sheet) -->
+    <string name="state_ready">Ready</string>
+    <string name="state_listening">Listening</string>
+    <string name="state_thinking">Thinking</string>
+    <string name="state_speaking">Speaking</string>
+    <string name="state_acting">Acting</string>
 
     <!-- Home -->
     <string name="home_title">What should I do\nfor you?</string>
