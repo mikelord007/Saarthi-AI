@@ -30,7 +30,10 @@ import com.saarthi.speech.Speaker
 import com.saarthi.speech.Speakers
 import com.saarthi.speech.SupportedLanguages
 import com.saarthi.speech.VoicePreferences
+import com.saarthi.ui.screens.HistoryScreen
 import com.saarthi.ui.screens.HomeScreen
+import com.saarthi.ui.screens.SettingsScreen
+import com.saarthi.ui.screens.ThreadDetailScreen
 import com.saarthi.ui.theme.SaarthiTheme
 import java.util.UUID
 import kotlinx.coroutines.launch
@@ -124,12 +127,32 @@ class MainActivity : ComponentActivity() {
                         onOpenSettings = { nav.go(Screen.Settings) },
                     )
 
-                    // --- History / thread detail / settings: wired up in a later commit. ---
-                    Screen.History, is Screen.ThreadDetail, Screen.Settings -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Coming soon")
-                        }
-                    }
+                    Screen.History -> HistoryScreen(
+                        entries = entries,
+                        onBack = nav::back,
+                        onOpenThread = { chatId -> threadDraft = ""; nav.go(Screen.ThreadDetail(chatId)) },
+                    )
+                    is Screen.ThreadDetail -> ThreadDetailScreen(
+                        entry = entries.firstOrNull { it.id == screen.chatId },
+                        onBack = nav::back,
+                        draft = threadDraft,
+                        onDraftChange = { threadDraft = it },
+                        onSend = { onThreadSend(screen.chatId) },
+                    )
+                    Screen.Settings -> SettingsScreen(
+                        onBack = nav::back,
+                        languages = SupportedLanguages.ALL,
+                        selectedLanguage = selectedLanguage,
+                        onLanguageSelected = ::onLanguageSelected,
+                        permissions = permissions,
+                        onOpenAccessibilitySettings = ::openAccessibilitySettings,
+                        onOpenMicrophoneSettings = ::openMicrophoneSettings,
+                        onOpenAssistantSettings = ::openAssistantSettings,
+                        narrateEveryStep = narrateEveryStep,
+                        onNarrateToggle = ::onNarrateToggle,
+                        speakSlowly = speakSlowly,
+                        onSpeakSlowlyToggle = ::onSpeakSlowlyToggle,
+                    )
                 }
                 }
             }
@@ -153,6 +176,22 @@ class MainActivity : ComponentActivity() {
         if (text.isEmpty()) return
         draft = ""
         submitTask(text)
+    }
+
+    private fun onThreadSend(chatId: String) {
+        val text = threadDraft.trim()
+        if (text.isEmpty()) return
+        threadDraft = ""
+        continueThread(chatId, text)
+    }
+
+    /** A message sent from inside an already-open thread — same idea as [submitTask], but appends instead of creating a new entry. */
+    private fun continueThread(chatId: String, userText: String) {
+        val existing = chatHistoryStore.find(chatId) ?: return
+        val entry = existing.copy(turns = existing.turns + ChatTurn("user", userText), status = ChatStatus.RUNNING)
+        chatHistoryStore.upsert(entry)
+        reloadHistory()
+        respondTo(entry)
     }
 
     /**

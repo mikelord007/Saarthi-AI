@@ -33,4 +33,48 @@
     <string name="home_text_placeholder">or type it instead</string>
     <string name="earlier_today">Earlier today</string>
     <string name="all">All</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="language_section">Language</string>
+    <string name="settings_language_note">Speaking and listening both use %1$s.</string>
+    <string name="permissions_section">Permissions</string>
+    <string name="permission_accessibility">Accessibility service</string>
+    <string name="permission_microphone">Microphone</string>
+    <string name="permission_default_assistant">Default assistant</string>
+    <string name="pill_on">On</string>
+    <string name="pill_off">Off</string>
+    <string name="behavior_section">How I behave</string>
+    <string name="toggle_narrate_title">Narrate every step</string>
+    <string name="toggle_narrate_desc">Say the action before doing it</string>
+    <string name="toggle_handback_title">Always hand back before payment</string>
+    <string name="toggle_handback_desc">Always on</string>
+    <string name="toggle_speak_slowly_title">Speak slowly</string>
+    <string name="toggle_speak_slowly_desc">Half speed, longer pauses</string>
+
+    <!-- History -->
+    <string name="history_title">History</string>
+    <string name="history_task_tag">Task</string>
+    <string name="note_narrated">Narrated the screen</string>
+    <string name="note_in_progress">In progress</string>
+    <string name="note_waiting_answer">Waiting for your answer</string>
+    <string name="note_done">Done</string>
+    <string name="note_handback_at">handed back at \"%1$s\"</string>
+    <string name="note_stopped">Stopped — %1$s</string>
+    <string name="note_couldnt_finish">Couldn\'t finish — %1$s</string>
+    <string name="unknown_reason">unknown reason</string>
+    <string name="conversation_note">\"%1$s\" → %2$s</string>
+    <plurals name="steps_count">
+        <item quantity="one">%1$d step</item>
+        <item quantity="other">%1$d steps</item>
+    </plurals>
+    <plurals name="replies_count">
+        <item quantity="one">%1$d reply</item>
+        <item quantity="other">%1$d replies</item>
+    </plurals>
+
+    <!-- Thread detail -->
+    <string name="conversation_title">Conversation</string>
+    <string name="conversation_gone">This conversation is gone.</string>
+    <string name="you_label">You</string>
 </resources>
