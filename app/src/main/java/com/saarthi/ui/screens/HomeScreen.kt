@@ -70,6 +70,7 @@ fun HomeScreen(
     onSuggestionTap: (String) -> Unit,
     onSend: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenThread: (String) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -131,7 +132,7 @@ fun HomeScreen(
         }
 
         if (recentEntries.isNotEmpty()) {
-            EarlierTodaySection(entries = recentEntries.take(2), onOpenHistory = onOpenHistory)
+            EarlierTodaySection(entries = recentEntries.take(2), onOpenHistory = onOpenHistory, onOpenThread = onOpenThread)
         }
 
         Hairline()
@@ -228,7 +229,7 @@ private fun HomeMicControl(isRecording: Boolean, isTranscribing: Boolean, onClic
 }
 
 @Composable
-private fun EarlierTodaySection(entries: List<ChatEntry>, onOpenHistory: () -> Unit) {
+private fun EarlierTodaySection(entries: List<ChatEntry>, onOpenHistory: () -> Unit, onOpenThread: (String) -> Unit) {
     Column(modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 10.dp)) {
             Kicker(text = stringResource(R.string.earlier_today), fontSize = 12.sp, letterSpacing = 0.18.em)
@@ -246,7 +247,7 @@ private fun EarlierTodaySection(entries: List<ChatEntry>, onOpenHistory: () -> U
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onOpenHistory)
+                    .clickable(onClick = { onOpenThread(entry.id) })
                     .padding(vertical = 11.dp, horizontal = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom,
