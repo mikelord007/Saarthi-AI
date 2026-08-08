@@ -2,12 +2,26 @@ package com.saarthi.chat
 
 import kotlinx.serialization.Serializable
 
+/**
+ * [isTaskStep] marks the terminal turn of a completed task run — not
+ * "where the task began" but where it ended, carrying its outcome. Set
+ * only on that one turn; every other turn (both sides of a plain chat
+ * exchange, and the user turn that triggered the task) leaves it false.
+ * [ThreadDetailScreen][com.saarthi.ui.screens.ThreadDetailScreen]'s
+ * `TaskStartTag` renders right above the first turn where this flips
+ * false -> true, so a thread that's chat for a while and then runs a
+ * task gets a marker exactly at that point.
+ */
 @Serializable
 data class ChatTurn(
     val role: String,
     val text: String,
-    /** True for a turn produced while running a task (as opposed to a plain reply) — lets a thread that starts as chat and later runs a task mark where the task began. */
     val isTaskStep: Boolean = false,
+    /** These four are set only when [isTaskStep] is true — same meaning as the matching [ChatEntry] fields, but scoped to this one run instead of the whole thread. Defaulted so turns persisted before these fields existed still decode. */
+    val taskStatus: ChatStatus? = null,
+    val blockCause: BlockCause? = null,
+    val handbackLabel: String? = null,
+    val taskStepCount: Int = 0,
 )
 
 enum class ChatStatus { RUNNING, DONE, ASK_USER, BLOCKED, ERROR }
