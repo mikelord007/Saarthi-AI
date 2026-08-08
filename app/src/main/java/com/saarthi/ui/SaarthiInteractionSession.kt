@@ -258,8 +258,8 @@ class SaarthiInteractionSession(baseContext: Context) :
                     )
                     beginListening()
                 }
-                RouterDecision.Task -> {
-                    currentTask = transcript
+                is RouterDecision.Task -> {
+                    currentTask = decision.task
                     invokeState = InvokeState.Heard(transcript = transcript, plan = context.getString(R.string.invoke_plan_template))
                 }
             }

@@ -195,7 +195,7 @@ class AssistActivity : ComponentActivity() {
                     MayaTts.speak(decision.reply, settings)
                     onStopRequested()
                 }
-                RouterDecision.Task -> runTask(service, transcript, settings)
+                is RouterDecision.Task -> runTask(service, decision.task, settings)
             }
         }
     }

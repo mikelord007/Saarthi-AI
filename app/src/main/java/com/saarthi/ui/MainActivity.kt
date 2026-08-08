@@ -303,11 +303,11 @@ class MainActivity : ComponentActivity() {
             }
             when (val decision = ChatRouter.classify(incoming, recentContext(entry), settings.language.displayName)) {
                 is RouterDecision.Chat -> finishChatReply(entry.id, decision.reply, settings)
-                RouterDecision.Task -> {
+                is RouterDecision.Task -> {
                     val existing = chatHistoryStore.find(entry.id) ?: return@launch
-                    chatHistoryStore.upsert(existing.copy(task = incoming, agentHistory = emptyList()))
+                    chatHistoryStore.upsert(existing.copy(task = decision.task, agentHistory = emptyList()))
                     reloadHistory()
-                    runAgent(entry.id, incoming, emptyList(), settings)
+                    runAgent(entry.id, decision.task, emptyList(), settings)
                 }
             }
         }

@@ -44,10 +44,17 @@ private const val MAX_TOKENS = 512
  * can never trigger the empty-screen HOME-press recovery or the
  * task-glow overlay, both of which only ever fire from inside
  * [AgentLoop.run].
+ *
+ * [Task.task] is a self-contained restatement of the instruction, not
+ * necessarily the raw message — a bare "yes" confirming a suggestion
+ * Saarthi just made in [Chat] (e.g. "Open Swiggy and order chicken
+ * biryani") is meaningless on its own to [AgentLoop], which never sees
+ * the [Chat] turn that gave it meaning. Callers must run this, not the
+ * raw message, through [AgentLoop.run].
  */
 sealed interface RouterDecision {
     data class Chat(val reply: String) : RouterDecision
-    data object Task : RouterDecision
+    data class Task(val task: String) : RouterDecision
 }
 
 /**
@@ -83,7 +90,7 @@ object ChatRouter {
         val apiKey = BuildConfig.ANTHROPIC_API_KEY
         if (apiKey.isBlank()) {
             log("✖ no API key — falling back to TASK")
-            return@withContext RouterDecision.Task
+            return@withContext RouterDecision.Task(message)
         }
 
         val requestBody = buildJsonObject {
@@ -124,38 +131,39 @@ object ChatRouter {
                 val rawBody = response.body?.string()
                 if (!response.isSuccessful || rawBody == null) {
                     log("✖ HTTP ${response.code} — falling back to TASK")
-                    RouterDecision.Task
+                    RouterDecision.Task(message)
                 } else {
-                    parseResponse(rawBody)
+                    parseResponse(rawBody, message)
                 }
             }
         } catch (e: IOException) {
             log("✖ failed: ${e.message} — falling back to TASK")
-            RouterDecision.Task
+            RouterDecision.Task(message)
         }
 
         when (decision) {
             is RouterDecision.Chat -> log("→ CHAT: \"${decision.reply}\"")
-            RouterDecision.Task -> log("→ TASK")
+            is RouterDecision.Task -> log("→ TASK: \"${decision.task}\"")
         }
         decision
     }
 
-    private fun parseResponse(rawBody: String): RouterDecision {
+    /** [originalMessage] is the fallback [RouterDecision.Task.task] on every error path, and when `start_task`'s own `task` field comes back blank. */
+    private fun parseResponse(rawBody: String, originalMessage: String): RouterDecision {
         val json = runCatching { Json.parseToJsonElement(rawBody).jsonObject }.getOrNull()
-            ?: run { log("✖ response was not valid JSON — falling back to TASK"); return RouterDecision.Task }
+            ?: run { log("✖ response was not valid JSON — falling back to TASK"); return RouterDecision.Task(originalMessage) }
 
         when (json["stop_reason"]?.jsonPrimitive?.contentOrNull) {
-            "refusal" -> { log("✖ refused — falling back to TASK"); return RouterDecision.Task }
-            "max_tokens" -> { log("✖ truncated before completing a tool call — falling back to TASK"); return RouterDecision.Task }
+            "refusal" -> { log("✖ refused — falling back to TASK"); return RouterDecision.Task(originalMessage) }
+            "max_tokens" -> { log("✖ truncated before completing a tool call — falling back to TASK"); return RouterDecision.Task(originalMessage) }
         }
 
         val content: JsonArray = json["content"]?.jsonArray
-            ?: run { log("✖ malformed response (no content) — falling back to TASK"); return RouterDecision.Task }
+            ?: run { log("✖ malformed response (no content) — falling back to TASK"); return RouterDecision.Task(originalMessage) }
         val toolUse = content
             .mapNotNull { it as? JsonObject }
             .firstOrNull { it["type"]?.jsonPrimitive?.contentOrNull == "tool_use" }
-            ?: run { log("✖ malformed response (no tool_use) — falling back to TASK"); return RouterDecision.Task }
+            ?: run { log("✖ malformed response (no tool_use) — falling back to TASK"); return RouterDecision.Task(originalMessage) }
 
         val name = toolUse["name"]?.jsonPrimitive?.contentOrNull
         val input = toolUse["input"]?.jsonObject
@@ -165,13 +173,16 @@ object ChatRouter {
                 val reply = input?.get("reply")?.jsonPrimitive?.contentOrNull
                 if (reply.isNullOrBlank()) {
                     log("✖ chat tool call had a blank reply — falling back to TASK")
-                    RouterDecision.Task
+                    RouterDecision.Task(originalMessage)
                 } else {
                     RouterDecision.Chat(reply)
                 }
             }
-            "start_task" -> RouterDecision.Task
-            else -> { log("✖ unrecognized tool \"$name\" — falling back to TASK"); RouterDecision.Task }
+            "start_task" -> {
+                val task = input?.get("task")?.jsonPrimitive?.contentOrNull
+                RouterDecision.Task(if (task.isNullOrBlank()) originalMessage else task)
+            }
+            else -> { log("✖ unrecognized tool \"$name\" — falling back to TASK"); RouterDecision.Task(originalMessage) }
         }
     }
 
@@ -192,7 +203,7 @@ object ChatRouter {
 
         Call exactly one tool:
         - chat: the message is a greeting, small talk, a question about Saarthi itself, thanks, or a follow-up that needs no action on the phone. Reply naturally and briefly (one to three short sentences) in %LANGUAGE%.
-        - start_task: the message asks you to open an app, find or search for something, change a setting, read the current screen, or do anything else that requires looking at or acting on the phone.
+        - start_task: the message asks you to open an app, find or search for something, change a setting, read the current screen, or do anything else that requires looking at or acting on the phone. Its `task` field is what actually reaches the device-control agent, which never sees RECENT — write it as a complete, self-contained instruction. If MESSAGE is already one (e.g. "open Chrome"), just use it as-is. If MESSAGE is short and only makes sense next to RECENT (e.g. "yes", "do it", "the second one" confirming or answering something Saarthi just said), resolve it into the actual instruction — e.g. if RECENT shows Saarthi asked "Want me to open Swiggy and order chicken biryani?" and MESSAGE is "yes", `task` should be "Open Swiggy and order chicken biryani", not "yes".
 
         When genuinely unsure which one applies, prefer start_task — a wrong "chat" call silently drops a real request, which is worse than one unnecessary task attempt.
 
@@ -235,8 +246,22 @@ object ChatRouter {
                     "input_schema",
                     buildJsonObject {
                         put("type", "object")
-                        put("properties", buildJsonObject {})
-                        put("required", buildJsonArray {})
+                        put(
+                            "properties",
+                            buildJsonObject {
+                                put(
+                                    "task",
+                                    buildJsonObject {
+                                        put("type", "string")
+                                        put(
+                                            "description",
+                                            "A complete, self-contained instruction for the device-control agent, in the user's language — resolved from MESSAGE and RECENT together, not just MESSAGE verbatim. See this tool's own description for a worked example.",
+                                        )
+                                    },
+                                )
+                            },
+                        )
+                        put("required", buildJsonArray { add("task") })
                     },
                 )
             },
