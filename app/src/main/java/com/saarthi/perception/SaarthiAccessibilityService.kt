@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import com.saarthi.BuildConfig
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,10 +59,15 @@ class SaarthiAccessibilityService : AccessibilityService() {
     // in-flight agent step can both be waiting at once.
     private val contentChangedWaiters = CopyOnWriteArrayList<CompletableDeferred<Unit>>()
 
+    private var debugActionReceiver: DebugActionReceiver? = null
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
         agentScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        if (BuildConfig.DEBUG) {
+            debugActionReceiver = DebugActionReceiver(this).also { it.register(this) }
+        }
         Log.i(TAG, "Accessibility service connected")
     }
 
@@ -84,12 +90,14 @@ class SaarthiAccessibilityService : AccessibilityService() {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
+        debugActionReceiver?.unregister(this)
         agentScope.cancel()
         instance = null
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
+        debugActionReceiver?.unregister(this)
         if (::agentScope.isInitialized) agentScope.cancel()
         instance = null
         super.onDestroy()
