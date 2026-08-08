@@ -216,10 +216,30 @@ class MainActivity : ComponentActivity() {
         continueThread(chatId, text)
     }
 
-    /** A message sent from inside an already-open thread — same idea as [submitTask], but appends instead of creating a new entry. */
+    /**
+     * A message sent from inside an already-open thread — same idea as
+     * [submitTask], but appends instead of creating a new entry.
+     *
+     * Only resumes the existing task (keeping [ChatEntry.task] and
+     * [ChatEntry.agentHistory] as-is) when the thread is actually paused
+     * on [ChatStatus.ASK_USER] — that's the one case where the reply is
+     * an answer to the agent's own question, not a new instruction.
+     * Every other status (DONE, BLOCKED, ERROR) means the previous run
+     * already finished, so a new message here is a brand-new task: it
+     * must overwrite [ChatEntry.task] and clear [ChatEntry.agentHistory],
+     * otherwise [respondTo] would keep running [AgentLoop] against
+     * whatever the thread's very first message was, ignoring what the
+     * user actually just typed.
+     */
     private fun continueThread(chatId: String, userText: String) {
         val existing = chatHistoryStore.find(chatId) ?: return
-        val entry = existing.copy(turns = existing.turns + ChatTurn("user", userText), status = ChatStatus.RUNNING)
+        val resuming = existing.status == ChatStatus.ASK_USER
+        val entry = existing.copy(
+            task = if (resuming) existing.task else userText,
+            turns = existing.turns + ChatTurn("user", userText),
+            status = ChatStatus.RUNNING,
+            agentHistory = if (resuming) existing.agentHistory else emptyList(),
+        )
         chatHistoryStore.upsert(entry)
         reloadHistory()
         respondTo(entry)
