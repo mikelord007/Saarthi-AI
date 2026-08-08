@@ -10,6 +10,11 @@ import com.saarthi.agent.AgentLoop
 import com.saarthi.agent.AgentPrompt
 import com.saarthi.agent.ClaudeClient
 import com.saarthi.agent.ClaudeDecision
+import com.saarthi.speech.AudioRecorder
+import com.saarthi.speech.MayaTts
+import com.saarthi.speech.SpeechToText
+import com.saarthi.speech.TranscriptionResult
+import com.saarthi.speech.VoicePreferences
 import kotlinx.coroutines.launch
 
 private const val TAG = "SaarthiDebugAction"
@@ -23,6 +28,8 @@ private const val ACTION_BACK = "com.saarthi.debug.BACK"
 private const val ACTION_HOME = "com.saarthi.debug.HOME"
 private const val ACTION_DECIDE = "com.saarthi.debug.DECIDE"
 private const val ACTION_RUN_TASK = "com.saarthi.debug.RUN_TASK"
+private const val ACTION_RECORD_START = "com.saarthi.debug.RECORD_START"
+private const val ACTION_RECORD_STOP = "com.saarthi.debug.RECORD_STOP"
 
 /**
  * Debug-build-only broadcast receiver that drives the perception layer,
@@ -48,11 +55,15 @@ private const val ACTION_RUN_TASK = "com.saarthi.debug.RUN_TASK"
  *     adb shell am broadcast -a com.saarthi.debug.HOME
  *     adb shell am broadcast -a com.saarthi.debug.DECIDE --es task "search for biryani on swiggy"
  *     adb shell am broadcast -a com.saarthi.debug.RUN_TASK --es task "search for biryani on swiggy"
+ *     adb shell am broadcast -a com.saarthi.debug.RECORD_START
+ *     adb shell am broadcast -a com.saarthi.debug.RECORD_STOP
  */
 class DebugActionReceiver(private val service: SaarthiAccessibilityService) : BroadcastReceiver() {
 
     @Volatile
     private var lastPerception: PerceptionResult? = null
+
+    private var audioRecorder: AudioRecorder? = null
 
     fun register(context: Context) {
         val filter = IntentFilter().apply {
@@ -66,6 +77,8 @@ class DebugActionReceiver(private val service: SaarthiAccessibilityService) : Br
             addAction(ACTION_HOME)
             addAction(ACTION_DECIDE)
             addAction(ACTION_RUN_TASK)
+            addAction(ACTION_RECORD_START)
+            addAction(ACTION_RECORD_STOP)
         }
         ContextCompat.registerReceiver(context, this, filter, ContextCompat.RECEIVER_EXPORTED)
     }
@@ -137,14 +150,53 @@ class DebugActionReceiver(private val service: SaarthiAccessibilityService) : Br
                     Log.w(TAG, "RUN_TASK requires --es task <task description>")
                     return
                 }
+                // Uses the user's real saved language/voice preferences —
+                // this is the same settings snapshot the UI-wired version
+                // (stage 8) will read.
+                val voiceSettings = VoicePreferences(service).settings
                 service.agentScope.launch {
                     AgentLoop.run(
                         service = service,
                         task = task,
-                        languageDisplayName = "English",
-                        speak = { text -> Log.i(TAG, "SPEAK: $text") },
+                        languageDisplayName = voiceSettings.language.displayName,
+                        narrateEveryStep = voiceSettings.narrateEveryStep,
+                        speak = { text ->
+                            Log.i(TAG, "SPEAK: $text")
+                            MayaTts.speak(text, voiceSettings)
+                        },
                         onEvent = { event -> Log.i(TAG, "EVENT: $event") },
                     )
+                }
+            }
+            ACTION_RECORD_START -> {
+                val recorder = AudioRecorder(service)
+                try {
+                    recorder.start()
+                    audioRecorder = recorder
+                    Log.i(TAG, "RECORD_START: recording — broadcast com.saarthi.debug.RECORD_STOP when done")
+                } catch (e: SecurityException) {
+                    Log.e(TAG, "RECORD_START: RECORD_AUDIO not granted at runtime — grant it via the app or `adb shell pm grant`", e)
+                }
+            }
+            ACTION_RECORD_STOP -> {
+                val recorder = audioRecorder
+                if (recorder == null) {
+                    Log.w(TAG, "No recording in progress — broadcast com.saarthi.debug.RECORD_START first")
+                    return
+                }
+                audioRecorder = null
+                val language = VoicePreferences(service).language
+                service.agentScope.launch {
+                    val file = recorder.stop()
+                    if (file == null) {
+                        Log.w(TAG, "RECORD_STOP: nothing was recorded")
+                        return@launch
+                    }
+                    Log.i(TAG, "RECORD_STOP: uploading ${file.length()} bytes to Sarvam")
+                    when (val result = SpeechToText.transcribe(file, language)) {
+                        is TranscriptionResult.Success -> Log.i(TAG, "TRANSCRIPT: ${result.transcript}")
+                        is TranscriptionResult.Failed -> Log.e(TAG, "TRANSCRIPT failed: ${result.message}")
+                    }
                 }
             }
         }
