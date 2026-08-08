@@ -71,6 +71,26 @@
                 android:resource="@xml/recognition_service" />
         </service>
 
+        <!--
+          Reads the foreground app's screen for the task agent and performs
+          taps/scrolls/typing on the user's behalf. See
+          perception.SaarthiAccessibilityService's doc for the perception +
+          execution design. No SYSTEM_ALERT_WINDOW needed — this service
+          never shows its own overlay.
+        -->
+        <service
+            android:name=".perception.SaarthiAccessibilityService"
+            android:exported="true"
+            android:label="@string/a11y_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
     </application>
 
 </manifest>

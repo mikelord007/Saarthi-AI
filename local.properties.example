@@ -1,1 +1,7 @@
 sdk.dir=/path/to/your/Android/Sdk
+
+# Task agent API keys — leave blank to build without them (the agent fails
+# loudly at runtime with a clear error instead of a bare 401/403).
+anthropic.apiKey=
+maya.apiKey=
+sarvam.apiKey=

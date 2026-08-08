@@ -112,6 +112,8 @@
     <string name="a11y_row_3">Never takes screenshots or photos</string>
     <string name="open_android_settings">Open Android settings</string>
     <string name="a11y_settings_path">Settings → Accessibility → Saarthi AI → On</string>
+    <string name="a11y_service_label">Saarthi AI</string>
+    <string name="a11y_service_description">Reads button and text labels on your screen, and taps or types on your behalf when you ask Saarthi to do a task. Never takes screenshots or reads your keyboard.</string>
 
     <!-- Onboarding: Assistant -->
     <string name="assistant_screen_title">Hold the home button for me</string>
