@@ -15,12 +15,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
+import com.saarthi.R
+import com.saarthi.agent.AgentEvent
+import com.saarthi.agent.AgentLoop
+import com.saarthi.chat.BlockCause
 import com.saarthi.chat.ChatEntry
 import com.saarthi.chat.ChatHistoryStore
 import com.saarthi.chat.ChatStatus
 import com.saarthi.chat.ChatTurn
+import com.saarthi.perception.SaarthiAccessibilityService
 import com.saarthi.speech.Language
+import com.saarthi.speech.MayaTts
 import com.saarthi.speech.Speaker
 import com.saarthi.speech.Speakers
 import com.saarthi.speech.SupportedLanguages
@@ -239,19 +244,85 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Turns a submitted message into a reply. This is the seam where real
-     * task handling plugs in later — for now it just closes the loop with a
-     * placeholder line so every screen downstream (thread view, history,
-     * status) has something real to render.
+     * Turns a submitted message into a real task run. [entry.agentHistory]
+     * is passed straight through as [AgentLoop.run]'s `initialHistory` —
+     * when this entry is mid-ASK_USER, [continueThread] calls back in here
+     * with the same entry, so a typed follow-up resumes the same task
+     * instead of starting a fresh one (mirrors
+     * [SaarthiInteractionSession]'s `pendingResume`, but keyed off the
+     * persisted entry instead of in-memory session state, since a thread
+     * can be reopened after the app was killed).
+     *
+     * Launched on [SaarthiAccessibilityService.agentScope], not this
+     * Activity's own coroutine scope — see that class's doc for why a
+     * takeover task's survival must not depend on the launching surface
+     * staying alive; the user can navigate away from this thread mid-run.
      */
     private fun respondTo(entry: ChatEntry) {
-        isThinking = true
-        lifecycleScope.launch {
-            val replyText = "Noted — I'll be able to act on this soon."
-            isThinking = false
-            chatHistoryStore.upsert(entry.copy(turns = entry.turns + ChatTurn("assistant", replyText), status = ChatStatus.DONE))
+        val service = SaarthiAccessibilityService.current()
+        if (service == null) {
+            chatHistoryStore.upsert(
+                entry.copy(turns = entry.turns + ChatTurn("assistant", getString(R.string.a11y_required_notice)), status = ChatStatus.ERROR),
+            )
             reloadHistory()
+            return
         }
+
+        isThinking = true
+        val settings = voicePreferences.settings
+        service.agentScope.launch {
+            AgentLoop.run(
+                service = service,
+                task = entry.task,
+                languageDisplayName = settings.language.displayName,
+                initialHistory = entry.agentHistory,
+                narrateEveryStep = settings.narrateEveryStep,
+                speak = { text -> MayaTts.speak(text, settings) },
+                onEvent = { event -> handleTypedTaskEvent(entry.id, event) },
+            )
+        }
+    }
+
+    private fun handleTypedTaskEvent(entryId: String, event: AgentEvent) {
+        // No per-step UI on this surface (unlike InvokeSheet's Working
+        // state) — isThinking just stays true for Step events, until a
+        // terminal event lands.
+        when (event) {
+            is AgentEvent.Step -> Unit
+            is AgentEvent.Done -> finishTypedTask(entryId, ChatStatus.DONE, event.summary)
+            is AgentEvent.AskUser -> finishTypedTask(entryId, ChatStatus.ASK_USER, event.question, agentHistory = event.history)
+            is AgentEvent.Blocked -> finishTypedTask(
+                entryId,
+                ChatStatus.BLOCKED,
+                event.reason,
+                blockCause = event.cause,
+                handbackLabel = event.actionLabel,
+            )
+            is AgentEvent.Error -> finishTypedTask(entryId, ChatStatus.ERROR, event.message)
+        }
+    }
+
+    private fun finishTypedTask(
+        entryId: String,
+        status: ChatStatus,
+        message: String,
+        agentHistory: List<String> = emptyList(),
+        blockCause: BlockCause? = null,
+        handbackLabel: String? = null,
+    ) {
+        isThinking = false
+        val existing = chatHistoryStore.find(entryId) ?: return
+        chatHistoryStore.upsert(
+            existing.copy(
+                turns = existing.turns + ChatTurn("assistant", message),
+                status = status,
+                stepCount = agentHistory.size.takeIf { it > 0 } ?: existing.stepCount,
+                blockCause = blockCause,
+                handbackLabel = handbackLabel,
+                agentHistory = agentHistory,
+            ),
+        )
+        reloadHistory()
     }
 
     // --- Voice input alternative ---

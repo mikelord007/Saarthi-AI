@@ -14,6 +14,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistry
@@ -21,17 +22,45 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.saarthi.R
+import com.saarthi.agent.AgentEvent
+import com.saarthi.agent.AgentLoop
+import com.saarthi.chat.BlockCause
+import com.saarthi.chat.ChatEntry
+import com.saarthi.chat.ChatHistoryStore
+import com.saarthi.chat.ChatStatus
+import com.saarthi.chat.ChatTurn
+import com.saarthi.chat.EntryKind
+import com.saarthi.perception.SaarthiAccessibilityService
+import com.saarthi.perception.ScreenPerception
+import com.saarthi.speech.AudioRecorder
+import com.saarthi.speech.MayaTts
+import com.saarthi.speech.SpeechToText
+import com.saarthi.speech.TranscriptionResult
 import com.saarthi.speech.VoicePreferences
 import com.saarthi.ui.screens.InvokeSheet
 import com.saarthi.ui.screens.InvokeState
 import com.saarthi.ui.theme.SaarthiTheme
+import java.util.UUID
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
- * The live session behind [InvokeSheet]: owns the sheet's [InvokeState] and
- * responds to its callbacks. Voice capture and task handling aren't wired
- * up yet, so only [InvokeState.Listening] is reachable right now — [Heard]
- * and [Working] are fully built and ready for whichever surface ends up
- * producing a transcript and a plan.
+ * The live session behind [InvokeSheet]: owns the sheet's [InvokeState],
+ * responds to its callbacks, and is the primary v1 surface for the task
+ * agent — its window is the platform voice-interaction session window,
+ * which is how "Assistant" visually persists over other apps, unlike
+ * [AssistActivity] (an ordinary Activity, paused the instant the agent
+ * navigates elsewhere). Verify on-device that this window really does
+ * survive backgrounding; the documented fallback if it doesn't is an
+ * AccessibilityService-owned `TYPE_ACCESSIBILITY_OVERLAY`.
+ *
+ * The running [AgentLoop] is launched on
+ * [SaarthiAccessibilityService.agentScope], never on this session's own
+ * [lifecycleScope] — a takeover task routinely backgrounds this session
+ * (pressing HOME, navigating into the target app), and this session's
+ * lifecycle must not be what the loop's survival depends on. Recording
+ * and transcription, by contrast, use [lifecycleScope]: nothing about
+ * capturing a spoken task needs to outlive this session.
  *
  * A [VoiceInteractionSession] is not an Activity and provides none of the
  * scaffolding Compose needs to host a [ComposeView] outside one — this class
@@ -59,12 +88,20 @@ class SaarthiInteractionSession(baseContext: Context) :
     override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
 
     private val voicePreferences by lazy { VoicePreferences(context) }
+    private val chatHistoryStore by lazy { ChatHistoryStore(context) }
+    private val audioRecorder by lazy { AudioRecorder(context) }
 
     /** Read fresh every use — the user may change language in Settings between invocations. */
     private val voice get() = voicePreferences.settings
 
     private var invokeState by mutableStateOf<InvokeState>(InvokeState.Listening)
     private var isRecording = false
+    private var currentTask: String = ""
+    private var currentJob: Job? = null
+
+    /** Set on [AgentEvent.AskUser]; consumed by the next [confirmPlan] so the SAME task resumes instead of starting over. */
+    private var pendingResume: PendingResume? = null
+    private data class PendingResume(val entryId: String, val task: String, val history: List<String>)
 
     init {
         // Must be called before onCreate() — see VoiceInteractionSession.setTheme's own doc — so it happens here, not in an onCreate override.
@@ -83,12 +120,12 @@ class SaarthiInteractionSession(baseContext: Context) :
                 InvokeSheet(
                     state = invokeState,
                     languageLabel = voice.language.displayName,
-                    onMicTap = ::onMicTap,
-                    onReadScreenAloud = ::dismissSession,
-                    onDoTaskForMe = ::dismissSession,
-                    onConfirmPlan = ::dismissSession,
+                    onMicTap = ::toggleRecording,
+                    onReadScreenAloud = ::readScreenAloud,
+                    onDoTaskForMe = ::toggleRecording,
+                    onConfirmPlan = ::confirmPlan,
                     onRetryTranscript = ::beginListening,
-                    onStop = ::dismissSession,
+                    onStop = ::stopTask,
                     onSwipeDownDismiss = ::dismissSession,
                 )
             }
@@ -124,21 +161,196 @@ class SaarthiInteractionSession(baseContext: Context) :
         return super.onKeyDown(keyCode, event)
     }
 
-    // --- Listening ---
+    // --- Listening / recording ---
 
     private fun beginListening() {
         invokeState = InvokeState.Listening
         isRecording = false
     }
 
-    /** Flips a local flag only — voice capture isn't wired up yet. */
-    private fun onMicTap() {
-        isRecording = !isRecording
+    private fun toggleRecording() {
+        if (isRecording) stopRecordingAndTranscribe() else startRecording()
+    }
+
+    private fun startRecording() {
+        try {
+            audioRecorder.start()
+            isRecording = true
+        } catch (e: SecurityException) {
+            // RECORD_AUDIO not granted at runtime — onboarding/Settings is
+            // responsible for that before this surface is reachable; stay
+            // in Listening rather than crash.
+        }
+    }
+
+    private fun stopRecordingAndTranscribe() {
+        isRecording = false
+        val settings = voice
+        lifecycleScope.launch {
+            val file = audioRecorder.stop()
+            if (file == null) {
+                beginListening()
+                return@launch
+            }
+            when (val result = SpeechToText.transcribe(file, settings.language)) {
+                is TranscriptionResult.Success -> {
+                    currentTask = result.transcript
+                    invokeState = InvokeState.Heard(
+                        transcript = result.transcript,
+                        plan = context.getString(R.string.invoke_plan_template),
+                    )
+                }
+                is TranscriptionResult.Failed -> beginListening()
+            }
+        }
+    }
+
+    // --- Read screen aloud ---
+
+    private fun readScreenAloud() {
+        val service = SaarthiAccessibilityService.current() ?: return
+        val settings = voice
+        lifecycleScope.launch {
+            val perception = ScreenPerception.capture(service, goHomeIfEmpty = false)
+            val summary = describeForNarration(perception.serialized)
+            MayaTts.speak(summary, settings)
+            chatHistoryStore.upsert(
+                ChatEntry(
+                    id = UUID.randomUUID().toString(),
+                    task = context.getString(R.string.note_narrated),
+                    timestamp = System.currentTimeMillis(),
+                    turns = listOf(ChatTurn(role = "assistant", text = summary)),
+                    status = ChatStatus.DONE,
+                    kind = EntryKind.NARRATION,
+                ),
+            )
+        }
+    }
+
+    /** Crude but LLM-free screen summary for "read this screen aloud": every quoted label, joined. */
+    private fun describeForNarration(serialized: String): String =
+        serialized.lineSequence()
+            .mapNotNull { line ->
+                val start = line.indexOf('"')
+                if (start < 0) return@mapNotNull null
+                val end = line.indexOf('"', start + 1)
+                if (end < 0) null else line.substring(start + 1, end).takeIf { it.isNotBlank() }
+            }
+            .joinToString(", ")
+            .ifBlank { context.getString(R.string.invoke_read_screen_empty) }
+
+    // --- Confirm plan / run the task ---
+
+    private fun confirmPlan() {
+        val service = SaarthiAccessibilityService.current() ?: return
+        val settings = voice
+        val resume = pendingResume
+        pendingResume = null
+
+        val entryId = resume?.entryId ?: UUID.randomUUID().toString()
+        val task = resume?.task ?: currentTask
+        val initialHistory = resume?.history ?: emptyList()
+
+        invokeState = InvokeState.Working(step = 1, of = 4, label = context.getString(R.string.state_thinking))
+        if (resume == null) persistEntry(entryId, task, ChatStatus.RUNNING, emptyList())
+
+        currentJob = service.agentScope.launch {
+            AgentLoop.run(
+                service = service,
+                task = task,
+                languageDisplayName = settings.language.displayName,
+                initialHistory = initialHistory,
+                narrateEveryStep = settings.narrateEveryStep,
+                speak = { text -> MayaTts.speak(text, settings) },
+                onEvent = { event -> handleAgentEvent(entryId, task, event) },
+            )
+        }
+    }
+
+    private fun handleAgentEvent(entryId: String, task: String, event: AgentEvent) {
+        when (event) {
+            is AgentEvent.Step -> {
+                invokeState = InvokeState.Working(
+                    step = ((event.index - 1) / 5 + 1).coerceIn(1, 4),
+                    of = 4,
+                    label = event.description,
+                )
+            }
+            is AgentEvent.Done -> {
+                persistEntry(entryId, task, ChatStatus.DONE, emptyList(), turns = listOf(ChatTurn("assistant", event.summary)))
+                dismissSession()
+            }
+            is AgentEvent.AskUser -> {
+                pendingResume = PendingResume(entryId, task, event.history)
+                persistEntry(
+                    entryId, task, ChatStatus.ASK_USER, event.history,
+                    turns = listOf(ChatTurn("assistant", event.question)),
+                )
+                beginListening()
+            }
+            is AgentEvent.Blocked -> {
+                persistEntry(
+                    entryId, task, ChatStatus.BLOCKED, emptyList(),
+                    turns = listOf(ChatTurn("assistant", event.reason)),
+                    blockCause = event.cause,
+                    handbackLabel = event.actionLabel,
+                )
+                // AgentLoop deliberately stays silent for IRREVERSIBLE_GUARD
+                // (see its own doc) — speaking the hand-back message is this
+                // surface's job, reusing the same copy the legacy
+                // AssistActivity/HandbackScreen flow shows. This session's
+                // window is a non-modal sheet over the target app, so simply
+                // dismissing it reveals the guarded button for the user to
+                // tap themselves — no separate confirmation card needed here.
+                if (event.cause == BlockCause.IRREVERSIBLE_GUARD) {
+                    val label = event.actionLabel.orEmpty()
+                    val message = "${context.getString(R.string.handback_action_question, label)} ${context.getString(R.string.handback_body)}"
+                    lifecycleScope.launch { MayaTts.speak(message, voice) }
+                }
+                dismissSession()
+            }
+            is AgentEvent.Error -> {
+                persistEntry(entryId, task, ChatStatus.ERROR, emptyList(), turns = listOf(ChatTurn("assistant", event.message)))
+                dismissSession()
+            }
+        }
+    }
+
+    private fun persistEntry(
+        id: String,
+        task: String,
+        status: ChatStatus,
+        agentHistory: List<String>,
+        turns: List<ChatTurn> = emptyList(),
+        blockCause: BlockCause? = null,
+        handbackLabel: String? = null,
+    ) {
+        val existing = chatHistoryStore.find(id)
+        chatHistoryStore.upsert(
+            ChatEntry(
+                id = id,
+                task = task,
+                timestamp = existing?.timestamp ?: System.currentTimeMillis(),
+                turns = existing?.turns.orEmpty() + turns,
+                status = status,
+                stepCount = agentHistory.size.takeIf { it > 0 } ?: existing?.stepCount ?: 0,
+                blockCause = blockCause,
+                handbackLabel = handbackLabel,
+                kind = EntryKind.TASK,
+                agentHistory = agentHistory,
+            ),
+        )
     }
 
     // --- Stop / dismiss ---
 
     /** Stop button, back, swipe-down all end here. */
+    private fun stopTask() {
+        currentJob?.cancel()
+        currentJob = null
+        dismissSession()
+    }
+
     private fun dismissSession() {
         finish()
     }

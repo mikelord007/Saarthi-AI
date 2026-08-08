@@ -114,6 +114,7 @@
     <string name="a11y_settings_path">Settings → Accessibility → Saarthi AI → On</string>
     <string name="a11y_service_label">Saarthi AI</string>
     <string name="a11y_service_description">Reads button and text labels on your screen, and taps or types on your behalf when you ask Saarthi to do a task. Never takes screenshots or reads your keyboard.</string>
+    <string name="a11y_required_notice">I need the accessibility permission turned on to do this — please enable it in Settings.</string>
 
     <!-- Onboarding: Assistant -->
     <string name="assistant_screen_title">Hold the home button for me</string>
@@ -146,4 +147,6 @@
     <string name="invoke_heard_promise">I stop before paying — you make the last tap.</string>
     <string name="invoke_confirm_button">Yes, go ahead</string>
     <string name="invoke_retry_button">No, let me say it again</string>
+    <string name="invoke_plan_template">I\'ll open the right app and take care of it.</string>
+    <string name="invoke_read_screen_empty">I couldn\'t find anything to read on this screen.</string>
 </resources>
