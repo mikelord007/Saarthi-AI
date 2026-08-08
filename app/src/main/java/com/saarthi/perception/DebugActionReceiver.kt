@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import com.saarthi.agent.AgentLoop
 import com.saarthi.agent.AgentPrompt
+import com.saarthi.agent.ChatRouter
 import com.saarthi.agent.ClaudeClient
 import com.saarthi.agent.ClaudeDecision
 import com.saarthi.speech.AudioRecorder
@@ -27,6 +28,7 @@ private const val ACTION_KEYBOARD_ENTER = "com.saarthi.debug.KEYBOARD_ENTER"
 private const val ACTION_BACK = "com.saarthi.debug.BACK"
 private const val ACTION_HOME = "com.saarthi.debug.HOME"
 private const val ACTION_DECIDE = "com.saarthi.debug.DECIDE"
+private const val ACTION_CLASSIFY = "com.saarthi.debug.CLASSIFY"
 private const val ACTION_RUN_TASK = "com.saarthi.debug.RUN_TASK"
 private const val ACTION_RECORD_START = "com.saarthi.debug.RECORD_START"
 private const val ACTION_RECORD_STOP = "com.saarthi.debug.RECORD_STOP"
@@ -54,6 +56,7 @@ private const val ACTION_RECORD_STOP = "com.saarthi.debug.RECORD_STOP"
  *     adb shell am broadcast -a com.saarthi.debug.BACK
  *     adb shell am broadcast -a com.saarthi.debug.HOME
  *     adb shell am broadcast -a com.saarthi.debug.DECIDE --es task "search for biryani on swiggy"
+ *     adb shell am broadcast -a com.saarthi.debug.CLASSIFY --es message "How are you?"
  *     adb shell am broadcast -a com.saarthi.debug.RUN_TASK --es task "search for biryani on swiggy"
  *     adb shell am broadcast -a com.saarthi.debug.RECORD_START
  *     adb shell am broadcast -a com.saarthi.debug.RECORD_STOP
@@ -76,6 +79,7 @@ class DebugActionReceiver(private val service: SaarthiAccessibilityService) : Br
             addAction(ACTION_BACK)
             addAction(ACTION_HOME)
             addAction(ACTION_DECIDE)
+            addAction(ACTION_CLASSIFY)
             addAction(ACTION_RUN_TASK)
             addAction(ACTION_RECORD_START)
             addAction(ACTION_RECORD_STOP)
@@ -142,6 +146,21 @@ class DebugActionReceiver(private val service: SaarthiAccessibilityService) : Br
                     is ClaudeDecision.Malformed -> Log.w(TAG, "DECIDE -> malformed response (no usable tool_use block)")
                     is ClaudeDecision.Refused -> Log.w(TAG, "DECIDE -> refused: ${decision.message}")
                     is ClaudeDecision.Failed -> Log.e(TAG, "DECIDE -> failed: ${decision.message}")
+                }
+            }
+            ACTION_CLASSIFY -> {
+                val message = intent.getStringExtra("message")
+                if (message == null) {
+                    Log.w(TAG, "CLASSIFY requires --es message <text>")
+                    return
+                }
+                // Deliberately does NOT call ScreenPerception — this is the
+                // whole point of ChatRouter, and the fastest way to prove
+                // it: this action alone can never press HOME or show the
+                // task-glow overlay.
+                val language = VoicePreferences(service).settings.language.displayName
+                service.agentScope.launch {
+                    Log.i(TAG, "CLASSIFY -> ${ChatRouter.classify(message, languageDisplayName = language)}")
                 }
             }
             ACTION_RUN_TASK -> {

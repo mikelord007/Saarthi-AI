@@ -14,6 +14,8 @@ import androidx.lifecycle.lifecycleScope
 import com.saarthi.R
 import com.saarthi.agent.AgentEvent
 import com.saarthi.agent.AgentLoop
+import com.saarthi.agent.ChatRouter
+import com.saarthi.agent.RouterDecision
 import com.saarthi.chat.BlockCause
 import com.saarthi.perception.SaarthiAccessibilityService
 import com.saarthi.speech.AudioRecorder
@@ -164,8 +166,36 @@ class AssistActivity : ComponentActivity() {
             }
 
             when (val result = SpeechToText.transcribe(file, settings.language)) {
-                is TranscriptionResult.Success -> runTask(service, result.transcript, settings)
+                is TranscriptionResult.Success -> onTranscript(service, result.transcript, settings)
                 is TranscriptionResult.Failed -> onStopRequested()
+            }
+        }
+    }
+
+    /**
+     * Routes through [ChatRouter] before ever calling [runTask] — see that
+     * class's doc for why a plain chat reply must never reach
+     * [AgentLoop.run] (it would press HOME to recover from Saarthi's own
+     * screen reading empty, and light the task-glow overlay for something
+     * that isn't a task). [voiceState] is already `Thinking` from
+     * [startAssistFlow] and covers the router's latency.
+     *
+     * The reply must be spoken (a suspend call that awaits playback)
+     * *before* [onStopRequested] — that function calls `finish()`
+     * synchronously, same as every other terminal branch in
+     * [handleAgentEvent], so setting [narrationLine] without awaiting
+     * playback first would never actually be seen or heard.
+     */
+    private fun onTranscript(service: SaarthiAccessibilityService, transcript: String, settings: com.saarthi.speech.VoiceSettings) {
+        lifecycleScope.launch {
+            when (val decision = ChatRouter.classify(transcript, languageDisplayName = settings.language.displayName)) {
+                is RouterDecision.Chat -> {
+                    voiceState = VoiceState.Speaking
+                    narrationLine = decision.reply
+                    MayaTts.speak(decision.reply, settings)
+                    onStopRequested()
+                }
+                RouterDecision.Task -> runTask(service, transcript, settings)
             }
         }
     }

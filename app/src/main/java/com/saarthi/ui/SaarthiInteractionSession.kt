@@ -24,6 +24,8 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.saarthi.R
 import com.saarthi.agent.AgentEvent
 import com.saarthi.agent.AgentLoop
+import com.saarthi.agent.ChatRouter
+import com.saarthi.agent.RouterDecision
 import com.saarthi.chat.BlockCause
 import com.saarthi.chat.ChatEntry
 import com.saarthi.chat.ChatHistoryStore
@@ -102,6 +104,9 @@ class SaarthiInteractionSession(baseContext: Context) :
     /** Set on [AgentEvent.AskUser]; consumed by the next [confirmPlan] so the SAME task resumes instead of starting over. */
     private var pendingResume: PendingResume? = null
     private data class PendingResume(val entryId: String, val task: String, val history: List<String>)
+
+    /** Highest [AgentEvent.Step] index seen this run — there's only ever one task in flight per session, unlike [MainActivity]'s per-entry map. Reset in [confirmPlan], consumed into [ChatTurn.taskStepCount] by the terminal event. */
+    private var lastStepIndex = 0
 
     init {
         // Must be called before onCreate() — see VoiceInteractionSession.setTheme's own doc — so it happens here, not in an onCreate override.
@@ -193,14 +198,50 @@ class SaarthiInteractionSession(baseContext: Context) :
                 return@launch
             }
             when (val result = SpeechToText.transcribe(file, settings.language)) {
-                is TranscriptionResult.Success -> {
-                    currentTask = result.transcript
-                    invokeState = InvokeState.Heard(
-                        transcript = result.transcript,
-                        plan = context.getString(R.string.invoke_plan_template),
-                    )
-                }
+                is TranscriptionResult.Success -> onTranscript(result.transcript, settings)
                 is TranscriptionResult.Failed -> beginListening()
+            }
+        }
+    }
+
+    /**
+     * A resume answer (mid-ASK_USER) always goes straight to [InvokeState.Heard]
+     * as before — it's an answer to the agent's own question, not a fresh
+     * instruction, so there's nothing to classify. Anything else is routed
+     * through [ChatRouter] first: a plain chat reply is spoken and the sheet
+     * returns to [InvokeState.Listening] without ever touching [AgentLoop] —
+     * see [ChatRouter]'s own doc for why that matters (no HOME press, no
+     * task-glow overlay). [InvokeState.Working] (rather than staying in
+     * [InvokeState.Listening]) covers the round-trip's latency — the same
+     * state [confirmPlan] uses for the same reason.
+     */
+    private fun onTranscript(transcript: String, settings: com.saarthi.speech.VoiceSettings) {
+        if (pendingResume != null) {
+            currentTask = transcript
+            invokeState = InvokeState.Heard(transcript = transcript, plan = context.getString(R.string.invoke_plan_template))
+            return
+        }
+        invokeState = InvokeState.Working(step = 1, of = 4, label = context.getString(R.string.state_thinking))
+        lifecycleScope.launch {
+            when (val decision = ChatRouter.classify(transcript, languageDisplayName = settings.language.displayName)) {
+                is RouterDecision.Chat -> {
+                    MayaTts.speak(decision.reply, settings)
+                    chatHistoryStore.upsert(
+                        ChatEntry(
+                            id = UUID.randomUUID().toString(),
+                            task = transcript,
+                            timestamp = System.currentTimeMillis(),
+                            turns = listOf(ChatTurn("user", transcript), ChatTurn("assistant", decision.reply)),
+                            status = ChatStatus.DONE,
+                            kind = EntryKind.TASK,
+                        ),
+                    )
+                    beginListening()
+                }
+                RouterDecision.Task -> {
+                    currentTask = transcript
+                    invokeState = InvokeState.Heard(transcript = transcript, plan = context.getString(R.string.invoke_plan_template))
+                }
             }
         }
     }
@@ -251,8 +292,9 @@ class SaarthiInteractionSession(baseContext: Context) :
         val task = resume?.task ?: currentTask
         val initialHistory = resume?.history ?: emptyList()
 
+        lastStepIndex = 0
         invokeState = InvokeState.Working(step = 1, of = 4, label = context.getString(R.string.state_thinking))
-        if (resume == null) persistEntry(entryId, task, ChatStatus.RUNNING, emptyList())
+        if (resume == null) persistEntry(entryId, task, ChatStatus.RUNNING, emptyList(), turns = listOf(ChatTurn("user", task)))
 
         currentJob = service.agentScope.launch {
             AgentLoop.run(
@@ -270,6 +312,7 @@ class SaarthiInteractionSession(baseContext: Context) :
     private fun handleAgentEvent(entryId: String, task: String, event: AgentEvent) {
         when (event) {
             is AgentEvent.Step -> {
+                lastStepIndex = event.index
                 invokeState = InvokeState.Working(
                     step = ((event.index - 1) / 5 + 1).coerceIn(1, 4),
                     of = 4,
@@ -277,7 +320,11 @@ class SaarthiInteractionSession(baseContext: Context) :
                 )
             }
             is AgentEvent.Done -> {
-                persistEntry(entryId, task, ChatStatus.DONE, emptyList(), turns = listOf(ChatTurn("assistant", event.summary)))
+                persistEntry(
+                    entryId, task, ChatStatus.DONE, emptyList(),
+                    turns = listOf(ChatTurn("assistant", event.summary)),
+                    isTaskStep = true, taskStatus = ChatStatus.DONE, taskStepCount = lastStepIndex,
+                )
                 dismissSession()
             }
             is AgentEvent.AskUser -> {
@@ -285,6 +332,7 @@ class SaarthiInteractionSession(baseContext: Context) :
                 persistEntry(
                     entryId, task, ChatStatus.ASK_USER, event.history,
                     turns = listOf(ChatTurn("assistant", event.question)),
+                    isTaskStep = true, taskStatus = ChatStatus.ASK_USER, taskStepCount = lastStepIndex,
                 )
                 beginListening()
             }
@@ -294,6 +342,7 @@ class SaarthiInteractionSession(baseContext: Context) :
                     turns = listOf(ChatTurn("assistant", event.reason)),
                     blockCause = event.cause,
                     handbackLabel = event.actionLabel,
+                    isTaskStep = true, taskStatus = ChatStatus.BLOCKED, taskStepCount = lastStepIndex,
                 )
                 // AgentLoop deliberately stays silent for IRREVERSIBLE_GUARD
                 // (see its own doc) — speaking the hand-back message is this
@@ -310,12 +359,23 @@ class SaarthiInteractionSession(baseContext: Context) :
                 dismissSession()
             }
             is AgentEvent.Error -> {
-                persistEntry(entryId, task, ChatStatus.ERROR, emptyList(), turns = listOf(ChatTurn("assistant", event.message)))
+                persistEntry(
+                    entryId, task, ChatStatus.ERROR, emptyList(),
+                    turns = listOf(ChatTurn("assistant", event.message)),
+                    isTaskStep = true, taskStatus = ChatStatus.ERROR, taskStepCount = lastStepIndex,
+                )
                 dismissSession()
             }
         }
     }
 
+    /**
+     * [isTaskStep]/[taskStatus]/[taskStepCount] are stamped onto [turns]
+     * only when [isTaskStep] is true — the initial "user" turn persisted
+     * from [confirmPlan] deliberately passes the default `false`, so the
+     * "Task" marker in [com.saarthi.ui.screens.ThreadDetailScreen] lands
+     * on the terminal outcome turn, not the request.
+     */
     private fun persistEntry(
         id: String,
         task: String,
@@ -324,16 +384,24 @@ class SaarthiInteractionSession(baseContext: Context) :
         turns: List<ChatTurn> = emptyList(),
         blockCause: BlockCause? = null,
         handbackLabel: String? = null,
+        isTaskStep: Boolean = false,
+        taskStatus: ChatStatus? = null,
+        taskStepCount: Int = 0,
     ) {
         val existing = chatHistoryStore.find(id)
+        val stampedTurns = if (isTaskStep) {
+            turns.map { it.copy(isTaskStep = true, taskStatus = taskStatus, blockCause = blockCause, handbackLabel = handbackLabel, taskStepCount = taskStepCount) }
+        } else {
+            turns
+        }
         chatHistoryStore.upsert(
             ChatEntry(
                 id = id,
                 task = task,
                 timestamp = existing?.timestamp ?: System.currentTimeMillis(),
-                turns = existing?.turns.orEmpty() + turns,
+                turns = existing?.turns.orEmpty() + stampedTurns,
                 status = status,
-                stepCount = agentHistory.size.takeIf { it > 0 } ?: existing?.stepCount ?: 0,
+                stepCount = maxOf(taskStepCount, agentHistory.size, existing?.stepCount ?: 0),
                 blockCause = blockCause,
                 handbackLabel = handbackLabel,
                 kind = EntryKind.TASK,

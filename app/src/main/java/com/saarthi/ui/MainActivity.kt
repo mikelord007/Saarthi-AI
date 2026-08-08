@@ -15,9 +15,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.saarthi.R
 import com.saarthi.agent.AgentEvent
 import com.saarthi.agent.AgentLoop
+import com.saarthi.agent.ChatRouter
+import com.saarthi.agent.RouterDecision
 import com.saarthi.chat.BlockCause
 import com.saarthi.chat.ChatEntry
 import com.saarthi.chat.ChatHistoryStore
@@ -63,6 +66,9 @@ class MainActivity : ComponentActivity() {
     private var isRecording by mutableStateOf(false)
     private var isTranscribing by mutableStateOf(false)
     private var isThinking by mutableStateOf(false)
+
+    /** Highest [AgentEvent.Step] index seen per in-flight entry — consumed by [finishTypedTask] into [ChatTurn.taskStepCount], since [AgentEvent.AskUser]'s `agentHistory` is the only other source of a step count and is empty for a normal Done/Blocked/Error run. */
+    private val stepCounts = mutableMapOf<String, Int>()
 
     private var selectedLanguage by mutableStateOf(SupportedLanguages.DEFAULT)
     private var selectedSpeaker by mutableStateOf(Speakers.DEFAULT)
@@ -234,15 +240,10 @@ class MainActivity : ComponentActivity() {
     private fun continueThread(chatId: String, userText: String) {
         val existing = chatHistoryStore.find(chatId) ?: return
         val resuming = existing.status == ChatStatus.ASK_USER
-        val entry = existing.copy(
-            task = if (resuming) existing.task else userText,
-            turns = existing.turns + ChatTurn("user", userText),
-            status = ChatStatus.RUNNING,
-            agentHistory = if (resuming) existing.agentHistory else emptyList(),
-        )
+        val entry = existing.copy(turns = existing.turns + ChatTurn("user", userText), status = ChatStatus.RUNNING)
         chatHistoryStore.upsert(entry)
         reloadHistory()
-        respondTo(entry)
+        respondTo(entry, incoming = userText, resuming = resuming)
     }
 
     /**
@@ -261,55 +262,97 @@ class MainActivity : ComponentActivity() {
         chatHistoryStore.upsert(entry)
         reloadHistory()
         nav.go(Screen.ThreadDetail(entry.id))
-        respondTo(entry)
+        respondTo(entry, incoming = userText, resuming = false)
     }
 
     /**
-     * Turns a submitted message into a real task run. [entry.agentHistory]
-     * is passed straight through as [AgentLoop.run]'s `initialHistory` —
-     * when this entry is mid-ASK_USER, [continueThread] calls back in here
-     * with the same entry, so a typed follow-up resumes the same task
-     * instead of starting a fresh one (mirrors
-     * [SaarthiInteractionSession]'s `pendingResume`, but keyed off the
-     * persisted entry instead of in-memory session state, since a thread
-     * can be reopened after the app was killed).
+     * Routes a fresh message before doing anything else: [ChatRouter]
+     * decides whether this needs [AgentLoop] at all, or is answered
+     * directly. This is the only thing standing between every typed
+     * message and a real task run — see [ChatRouter]'s own doc for why a
+     * plain "how are you" must never reach [AgentLoop.run] (perception
+     * excludes Saarthi's own windows, so it would read the Home screen as
+     * empty and press HOME to recover, and the task-glow overlay would
+     * show for something that isn't a task).
      *
-     * Launched on [SaarthiAccessibilityService.agentScope], not this
-     * Activity's own coroutine scope — see that class's doc for why a
-     * takeover task's survival must not depend on the launching surface
-     * staying alive; the user can navigate away from this thread mid-run.
+     * [resuming] skips the router entirely — a thread paused on
+     * ASK_USER's next reply is an answer to the agent's own question, not
+     * a fresh instruction, and there's nothing sensible to classify.
+     * [entry.task]/[entry.agentHistory] are only overwritten once we know
+     * this is genuinely a new task (see [runAgent]) — a plain chat reply
+     * must never clobber the thread's task title with itself.
+     *
+     * Launched on [SaarthiAccessibilityService.agentScope] when available
+     * — see that class's doc for why a takeover task's survival must not
+     * depend on the launching surface staying alive — falling back to
+     * [lifecycleScope] only for the classify-and-maybe-chat path, which
+     * needs neither the service nor that guarantee.
      */
-    private fun respondTo(entry: ChatEntry) {
+    private fun respondTo(entry: ChatEntry, incoming: String, resuming: Boolean) {
+        isThinking = true
+        val settings = voicePreferences.settings
+        val scope = SaarthiAccessibilityService.current()?.agentScope ?: lifecycleScope
+        scope.launch {
+            if (resuming) {
+                runAgent(entry.id, entry.task, entry.agentHistory, settings)
+                return@launch
+            }
+            when (val decision = ChatRouter.classify(incoming, recentContext(entry), settings.language.displayName)) {
+                is RouterDecision.Chat -> finishChatReply(entry.id, decision.reply, settings)
+                RouterDecision.Task -> {
+                    val existing = chatHistoryStore.find(entry.id) ?: return@launch
+                    chatHistoryStore.upsert(existing.copy(task = incoming, agentHistory = emptyList()))
+                    reloadHistory()
+                    runAgent(entry.id, incoming, emptyList(), settings)
+                }
+            }
+        }
+    }
+
+    /** The `Task` half of [respondTo] — everything that was `respondTo` before [ChatRouter] existed. */
+    private fun runAgent(entryId: String, task: String, initialHistory: List<String>, settings: com.saarthi.speech.VoiceSettings) {
         val service = SaarthiAccessibilityService.current()
         if (service == null) {
+            isThinking = false
+            val existing = chatHistoryStore.find(entryId) ?: return
             chatHistoryStore.upsert(
-                entry.copy(turns = entry.turns + ChatTurn("assistant", getString(R.string.a11y_required_notice)), status = ChatStatus.ERROR),
+                existing.copy(turns = existing.turns + ChatTurn("assistant", getString(R.string.a11y_required_notice)), status = ChatStatus.ERROR),
             )
             reloadHistory()
             return
         }
-
-        isThinking = true
-        val settings = voicePreferences.settings
         service.agentScope.launch {
             AgentLoop.run(
                 service = service,
-                task = entry.task,
+                task = task,
                 languageDisplayName = settings.language.displayName,
-                initialHistory = entry.agentHistory,
+                initialHistory = initialHistory,
                 narrateEveryStep = settings.narrateEveryStep,
                 speak = { text -> MayaTts.speak(text, settings) },
-                onEvent = { event -> handleTypedTaskEvent(entry.id, event) },
+                onEvent = { event -> handleTypedTaskEvent(entryId, event) },
             )
         }
     }
+
+    /** The `Chat` half of [respondTo] — never touches [AgentLoop]/[SaarthiAccessibilityService] at all. */
+    private suspend fun finishChatReply(entryId: String, reply: String, settings: com.saarthi.speech.VoiceSettings) {
+        isThinking = false
+        val existing = chatHistoryStore.find(entryId) ?: return
+        chatHistoryStore.upsert(existing.copy(turns = existing.turns + ChatTurn("assistant", reply), status = ChatStatus.DONE))
+        reloadHistory()
+        MayaTts.speak(reply, settings)
+    }
+
+    /** A short excerpt for [ChatRouter] — enough to tell "continuing this chat" from "starting fresh" without sending the whole thread. */
+    private fun recentContext(entry: ChatEntry): List<String> =
+        entry.turns.takeLast(6).map { "${it.role}: ${it.text.take(200)}" }
 
     private fun handleTypedTaskEvent(entryId: String, event: AgentEvent) {
         // No per-step UI on this surface (unlike InvokeSheet's Working
         // state) — isThinking just stays true for Step events, until a
         // terminal event lands.
         when (event) {
-            is AgentEvent.Step -> Unit
+            is AgentEvent.Step -> stepCounts[entryId] = event.index
             is AgentEvent.Done -> finishTypedTask(entryId, ChatStatus.DONE, event.summary)
             is AgentEvent.AskUser -> finishTypedTask(entryId, ChatStatus.ASK_USER, event.question, agentHistory = event.history)
             is AgentEvent.Blocked -> finishTypedTask(
@@ -333,11 +376,20 @@ class MainActivity : ComponentActivity() {
     ) {
         isThinking = false
         val existing = chatHistoryStore.find(entryId) ?: return
+        val stepIndex = stepCounts.remove(entryId) ?: 0
+        val stepCount = maxOf(stepIndex, agentHistory.size, existing.stepCount)
         chatHistoryStore.upsert(
             existing.copy(
-                turns = existing.turns + ChatTurn("assistant", message),
+                turns = existing.turns + ChatTurn(
+                    "assistant", message,
+                    isTaskStep = true,
+                    taskStatus = status,
+                    blockCause = blockCause,
+                    handbackLabel = handbackLabel,
+                    taskStepCount = stepCount,
+                ),
                 status = status,
-                stepCount = agentHistory.size.takeIf { it > 0 } ?: existing.stepCount,
+                stepCount = stepCount,
                 blockCause = blockCause,
                 handbackLabel = handbackLabel,
                 agentHistory = agentHistory,

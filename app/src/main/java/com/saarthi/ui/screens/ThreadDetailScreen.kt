@@ -49,7 +49,8 @@ import com.saarthi.ui.theme.SaarthiType
  * fill). Carries its own message row so a thread can keep going here — chat
  * for a while, then ask for a task, all in the same conversation — instead
  * of being read-only. A thread that starts as chat and then runs a task
- * gets a "Task" tag right where the task turns begin.
+ * gets a "Task" tag with its outcome (steps/done/handed back/etc, same
+ * note text [HistoryScreen] shows) right above the turn where it finished.
  */
 @Composable
 fun ThreadDetailScreen(
@@ -95,7 +96,7 @@ fun ThreadDetailScreen(
         LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 22.dp)) {
             itemsIndexed(entry.turns) { index, turn ->
                 val taskStartsHere = turn.isTaskStep && (index == 0 || !entry.turns[index - 1].isTaskStep)
-                if (taskStartsHere) TaskStartTag()
+                if (taskStartsHere) TaskStartTag(turn)
                 TurnRow(turn)
             }
             if (entry.status == ChatStatus.RUNNING) {
@@ -165,10 +166,20 @@ private fun ThinkingRow() {
     }
 }
 
+/** The marker showing a task ran at this point in the thread — [turn] is always the terminal outcome turn (see [ChatTurn.isTaskStep]'s doc), so its own fields carry the outcome to render, same note text [HistoryScreen] shows per-entry. */
 @Composable
-private fun TaskStartTag() {
-    Box(modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) {
+private fun TaskStartTag(turn: ChatTurn) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Pill(text = stringResource(R.string.history_task_tag), on = true)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = taskOutcomeNote(turn.taskStatus ?: ChatStatus.DONE, turn.blockCause, turn.handbackLabel, turn.taskStepCount, turn.text),
+            style = TextStyle(fontFamily = SaarthiType.Lora, fontSize = 14.sp, fontStyle = FontStyle.Italic),
+            color = SaarthiColors.Neutral600,
+        )
     }
 }
 

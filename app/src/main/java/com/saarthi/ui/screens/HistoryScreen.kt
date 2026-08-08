@@ -27,9 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.saarthi.R
-import com.saarthi.chat.BlockCause
 import com.saarthi.chat.ChatEntry
-import com.saarthi.chat.ChatStatus
 import com.saarthi.chat.EntryKind
 import com.saarthi.ui.components.Hairline
 import com.saarthi.ui.components.Kicker
@@ -126,19 +124,7 @@ private fun HistoryRow(title: String, time: String, note: String, isTask: Boolea
 @Composable
 private fun taskNote(entry: ChatEntry): String {
     if (entry.kind == EntryKind.NARRATION) return stringResource(R.string.note_narrated)
-    return when (entry.status) {
-        ChatStatus.RUNNING -> stringResource(R.string.note_in_progress)
-        ChatStatus.ASK_USER -> stringResource(R.string.note_waiting_answer)
-        ChatStatus.DONE -> if (entry.stepCount > 0) pluralStringResource(R.plurals.steps_count, entry.stepCount, entry.stepCount) else stringResource(R.string.note_done)
-        ChatStatus.BLOCKED -> when (entry.blockCause) {
-            BlockCause.IRREVERSIBLE_GUARD -> {
-                val stepsPart = if (entry.stepCount > 0) pluralStringResource(R.plurals.steps_count, entry.stepCount, entry.stepCount) + " · " else ""
-                stepsPart + stringResource(R.string.note_handback_at, entry.handbackLabel ?: "")
-            }
-            else -> stringResource(R.string.note_stopped, lastAssistantText(entry))
-        }
-        ChatStatus.ERROR -> stringResource(R.string.note_couldnt_finish, lastAssistantText(entry))
-    }
+    return taskOutcomeNote(entry.status, entry.blockCause, entry.handbackLabel, entry.stepCount, lastAssistantText(entry))
 }
 
 @Composable
