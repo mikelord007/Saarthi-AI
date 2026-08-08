@@ -16,7 +16,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 
 private const val SARVAM_STT_URL = "https://api.sarvam.ai/speech-to-text"
-private const val SARVAM_MODEL = "saaras:v3"
+
+/** Latest STT model as of writing — see [com.saarthi.speech.SarvamTts]'s own `SARVAM_TTS_MODEL` doc for the matching TTS pick. */
+private const val SARVAM_MODEL = "saaras:v4"
 
 sealed interface TranscriptionResult {
     data class Success(val transcript: String) : TranscriptionResult
