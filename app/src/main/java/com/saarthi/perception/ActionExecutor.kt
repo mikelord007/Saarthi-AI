@@ -231,6 +231,18 @@ object ActionExecutor {
         return ActionResult.Success
     }
 
+    suspend fun openNotifications(service: SaarthiAccessibilityService): ActionResult {
+        service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
+        service.awaitSettled()
+        return ActionResult.Success
+    }
+
+    suspend fun openQuickSettings(service: SaarthiAccessibilityService): ActionResult {
+        service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS)
+        service.awaitSettled()
+        return ActionResult.Success
+    }
+
     // ---- shared helpers -----------------------------------------------------
 
     /** Runs [IrreversibleActionGuard] and, on a match, returns [ActionResult.Blocked] without performing anything. */

@@ -175,6 +175,7 @@ class SaarthiInteractionSession(baseContext: Context) :
     private fun beginListening() {
         invokeState = InvokeState.Listening
         isRecording = false
+        startRecording()
     }
 
     private fun toggleRecording() {

@@ -297,6 +297,8 @@ object AgentLoop {
         is AgentTool.KeyboardEnter -> ActionExecutor.keyboardEnter(service, perception)
         is AgentTool.Back -> ActionExecutor.back(service)
         is AgentTool.Home -> ActionExecutor.home(service)
+        is AgentTool.Notifications -> ActionExecutor.openNotifications(service)
+        is AgentTool.QuickSettings -> ActionExecutor.openQuickSettings(service)
         else -> error("execute() called with a terminal/answer tool: $tool")
     }
 
@@ -308,6 +310,8 @@ object AgentLoop {
         is AgentTool.KeyboardEnter -> tool.say
         is AgentTool.Back -> tool.say
         is AgentTool.Home -> tool.say
+        is AgentTool.Notifications -> tool.say
+        is AgentTool.QuickSettings -> tool.say
         else -> null
     }
 
@@ -319,6 +323,8 @@ object AgentLoop {
         is AgentTool.KeyboardEnter -> "keyboard_enter"
         is AgentTool.Back -> "back"
         is AgentTool.Home -> "home"
+        is AgentTool.Notifications -> "notifications"
+        is AgentTool.QuickSettings -> "quick_settings"
         else -> tool.toString()
     }
 

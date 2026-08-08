@@ -27,11 +27,14 @@ import com.saarthi.chat.ChatHistoryStore
 import com.saarthi.chat.ChatStatus
 import com.saarthi.chat.ChatTurn
 import com.saarthi.perception.SaarthiAccessibilityService
+import com.saarthi.speech.AudioRecorder
 import com.saarthi.speech.Language
 import com.saarthi.speech.MayaTts
 import com.saarthi.speech.Speaker
 import com.saarthi.speech.Speakers
+import com.saarthi.speech.SpeechToText
 import com.saarthi.speech.SupportedLanguages
+import com.saarthi.speech.TranscriptionResult
 import com.saarthi.speech.VoicePreferences
 import com.saarthi.ui.screens.HistoryScreen
 import com.saarthi.ui.screens.HomeScreen
@@ -58,6 +61,7 @@ class MainActivity : ComponentActivity() {
     private val chatHistoryStore by lazy { ChatHistoryStore(applicationContext) }
     private val voicePreferences by lazy { VoicePreferences(applicationContext) }
     private val onboardingPreferences by lazy { OnboardingPreferences(applicationContext) }
+    private val audioRecorder by lazy { AudioRecorder(this) }
 
     private var entries by mutableStateOf<List<ChatEntry>>(emptyList())
     private var draft by mutableStateOf("")
@@ -79,11 +83,11 @@ class MainActivity : ComponentActivity() {
     /** A class field, not a `remember` inside setContent, so [submitTask] can navigate to the new thread as soon as it's created. */
     private lateinit var nav: SaarthiNav
 
-    /** Home's mic control — a grant here should immediately reflect as recording. */
+    /** Home's mic control — a grant here should immediately start recording. */
     private val requestMicPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) isRecording = true
+        if (granted) startRecording()
     }
 
     /** Onboarding's "Allow microphone" — advances regardless of the result; the grant itself is all this needs to do. */
@@ -400,18 +404,50 @@ class MainActivity : ComponentActivity() {
 
     // --- Voice input alternative ---
 
-    /** Flips the recording indicator only — capture/transcription isn't wired up yet. */
     private fun onMicToggle() {
         if (isRecording) {
-            isRecording = false
+            stopRecordingAndTranscribe()
             return
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         ) {
-            isRecording = true
+            startRecording()
         } else {
             requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun startRecording() {
+        try {
+            audioRecorder.start()
+            isRecording = true
+        } catch (e: SecurityException) {
+            // RECORD_AUDIO not granted at runtime despite the check above
+            // (e.g. revoked between the check and this call) — stay idle
+            // rather than crash.
+        }
+    }
+
+    private fun stopRecordingAndTranscribe() {
+        isRecording = false
+        isTranscribing = true
+        val settings = voicePreferences.settings
+        lifecycleScope.launch {
+            val file = audioRecorder.stop()
+            if (file == null) {
+                isTranscribing = false
+                return@launch
+            }
+            when (val result = SpeechToText.transcribe(file, settings.language)) {
+                is TranscriptionResult.Success -> {
+                    isTranscribing = false
+                    submitTask(result.transcript)
+                }
+                is TranscriptionResult.Failed -> {
+                    isTranscribing = false
+                }
+            }
         }
     }
 

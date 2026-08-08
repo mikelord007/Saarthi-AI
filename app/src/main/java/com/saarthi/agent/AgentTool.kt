@@ -13,7 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- * The agent's 11-action vocabulary. Nothing in this file (or anywhere
+ * The agent's 13-action vocabulary. Nothing in this file (or anywhere
  * under `com.saarthi.agent`) imports `android.view.accessibility.*` — the
  * agent reasons purely over the ref strings [com.saarthi.perception.ScreenPerception]
  * hands out; only `com.saarthi.perception` ever touches a real node.
@@ -35,6 +35,8 @@ sealed interface AgentTool {
     data class KeyboardEnter(val say: String, val reasoning: String) : AgentTool
     data class Back(val say: String, val reasoning: String) : AgentTool
     data class Home(val say: String, val reasoning: String) : AgentTool
+    data class Notifications(val say: String, val reasoning: String) : AgentTool
+    data class QuickSettings(val say: String, val reasoning: String) : AgentTool
 
     /** Speaks [text] but does NOT end the task — `done` must still follow. See the `answer` tool description below for why this exists separately from `done`. */
     data class Answer(val text: String) : AgentTool
@@ -81,6 +83,8 @@ object AgentToolParser {
             )
             "back" -> AgentTool.Back(say = input.string("say").orEmpty(), reasoning = input.string("reasoning").orEmpty())
             "home" -> AgentTool.Home(say = input.string("say").orEmpty(), reasoning = input.string("reasoning").orEmpty())
+            "notifications" -> AgentTool.Notifications(say = input.string("say").orEmpty(), reasoning = input.string("reasoning").orEmpty())
+            "quick_settings" -> AgentTool.QuickSettings(say = input.string("say").orEmpty(), reasoning = input.string("reasoning").orEmpty())
             "answer" -> AgentTool.Answer(text = input.string("text") ?: return null)
             "done" -> AgentTool.Done(summary = input.string("summary") ?: return null)
             "ask_user" -> AgentTool.AskUser(question = input.string("question") ?: return null)
@@ -92,7 +96,7 @@ object AgentToolParser {
     private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 }
 
-/** The Claude tool-schema (`name`/`description`/`input_schema`) for each of the 11 [AgentTool] variants. */
+/** The Claude tool-schema (`name`/`description`/`input_schema`) for each of the 13 [AgentTool] variants. */
 private object AgentToolSchema {
 
     private const val SAY_DESCRIPTION =
@@ -172,6 +176,22 @@ private object AgentToolSchema {
             toolDef(
                 "home",
                 "Press the device Home button — leaves the current app entirely. Rarely needed mid-task.",
+                mapOf("say" to stringProp(SAY_DESCRIPTION), "reasoning" to stringProp(REASONING_DESCRIPTION)),
+                listOf("say", "reasoning"),
+            ),
+        )
+        add(
+            toolDef(
+                "notifications",
+                "Open the notification shade, exactly like swiping down from the top of the screen — use this instead of trying to scroll or swipe to see notifications.",
+                mapOf("say" to stringProp(SAY_DESCRIPTION), "reasoning" to stringProp(REASONING_DESCRIPTION)),
+                listOf("say", "reasoning"),
+            ),
+        )
+        add(
+            toolDef(
+                "quick_settings",
+                "Open Quick Settings (Wi-Fi, Bluetooth, flashlight, and other toggles), exactly like swiping down twice from the top of the screen — use this instead of trying to scroll or swipe to reach these toggles.",
                 mapOf("say" to stringProp(SAY_DESCRIPTION), "reasoning" to stringProp(REASONING_DESCRIPTION)),
                 listOf("say", "reasoning"),
             ),

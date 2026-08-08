@@ -41,6 +41,8 @@ object AgentPrompt {
         - Use done as soon as the current SCREEN already shows what the task asked for — don't keep tapping once the goal is achieved.
         - For tasks that ask a question (e.g. "what's on my calendar tomorrow"), use answer to speak the answer, then done — merely displaying the answer on screen is not enough.
         - If a HISTORY line ends with "screen did not change, this had no visible effect", do not repeat that exact action — try something else.
+        - To open an app, prefer the home screen's search bar over scrolling to the app drawer: tap the search field (e.g. "Search apps, web and more"), then set_text with the app's name, then tap the matching result. The swipe gesture used to reach the app drawer is unreliable to trigger — treat scrolling there as a last resort, only when no search field is available.
+        - To see notifications, use the notifications tool — never try to scroll or swipe down from the top of the screen for this. To reach Wi-Fi/Bluetooth/flashlight-style toggles, use the quick_settings tool the same way.
         - If scrolling one direction doesn't reveal what you expect, try the opposite direction next.
         - If you tapped something and landed on a screen with an editable search field (e.g. "Search apps, web and more", "Search settings"), that field is how you finish the search — type what you're looking for into it with set_text, then check the results. Do not call back just because the screen is labeled "search" — an untried search field is not a dead end.
         - Use ask_user only when you genuinely need information or a decision only the user can provide.
