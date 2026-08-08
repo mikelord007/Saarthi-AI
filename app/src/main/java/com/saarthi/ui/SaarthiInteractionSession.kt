@@ -40,7 +40,7 @@ import com.saarthi.chat.EntryKind
 import com.saarthi.perception.SaarthiAccessibilityService
 import com.saarthi.perception.ScreenPerception
 import com.saarthi.speech.SarvamStreamingStt
-import com.saarthi.speech.SarvamTts
+import com.saarthi.speech.MayaTts
 import com.saarthi.speech.TranscriptionResult
 import com.saarthi.speech.VoicePreferences
 import com.saarthi.ui.screens.InvokeSheet
@@ -252,7 +252,7 @@ class SaarthiInteractionSession(baseContext: Context) :
         lifecycleScope.launch {
             when (val decision = ChatRouter.classify(transcript, languageDisplayName = settings.language.displayName)) {
                 is RouterDecision.Chat -> {
-                    SarvamTts.speak(decision.reply, settings)
+                    MayaTts.speak(decision.reply, settings)
                     chatHistoryStore.upsert(
                         ChatEntry(
                             id = UUID.randomUUID().toString(),
@@ -281,7 +281,7 @@ class SaarthiInteractionSession(baseContext: Context) :
         lifecycleScope.launch {
             val perception = ScreenPerception.capture(service, goHomeIfEmpty = false)
             val summary = describeForNarration(perception.serialized)
-            SarvamTts.speak(summary, settings)
+            MayaTts.speak(summary, settings)
             chatHistoryStore.upsert(
                 ChatEntry(
                     id = UUID.randomUUID().toString(),
@@ -330,7 +330,7 @@ class SaarthiInteractionSession(baseContext: Context) :
                 languageDisplayName = settings.language.displayName,
                 initialHistory = initialHistory,
                 narrateEveryStep = settings.narrateEveryStep,
-                speak = { text -> SarvamTts.speak(text, settings) },
+                speak = { text -> MayaTts.speak(text, settings) },
                 onEvent = { event -> handleAgentEvent(entryId, task, event) },
             )
         }
@@ -381,7 +381,7 @@ class SaarthiInteractionSession(baseContext: Context) :
                 if (event.cause == BlockCause.IRREVERSIBLE_GUARD) {
                     val label = event.actionLabel.orEmpty()
                     val message = "${context.getString(R.string.handback_action_question, label)} ${context.getString(R.string.handback_body)}"
-                    lifecycleScope.launch { SarvamTts.speak(message, voice) }
+                    lifecycleScope.launch { MayaTts.speak(message, voice) }
                 }
                 dismissSession()
             }

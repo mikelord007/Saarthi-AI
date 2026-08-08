@@ -92,7 +92,7 @@
     <!-- Onboarding: Voice -->
     <string name="voice_screen_title">મારે કોનો અવાજ વાપરવો જોઈએ?</string>
     <string name="voice_screen_body">એક પર ટૅપ કરીને તેને તમારા માટે એક વાક્ય વાંચતું સાંભળો.</string>
-    <string name="onboarding_voice_sample_line">મને Ola મળી ગયું. હમણાં ખોલી રહ્યો છું.</string>
+    <string name="onboarding_voice_sample_line">નમસ્તે, હું Saarthi છું, તમારો સહાયક.</string>
     <string name="use_this_voice">આ અવાજ વાપરો</string>
 
     <!-- Onboarding: Mic -->

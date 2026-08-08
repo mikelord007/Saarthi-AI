@@ -17,7 +17,7 @@ import okhttp3.RequestBody.Companion.asRequestBody
 
 private const val SARVAM_STT_URL = "https://api.sarvam.ai/speech-to-text"
 
-/** Latest STT model as of writing — see [com.saarthi.speech.SarvamTts]'s own `SARVAM_TTS_MODEL` doc for the matching TTS pick. */
+/** Latest STT model as of writing. Narration TTS is on Maya now (see [com.saarthi.speech.MayaTts]), an unrelated provider, so there's no matching TTS-model pick to cross-reference here anymore. */
 private const val SARVAM_MODEL = "saaras:v4"
 
 sealed interface TranscriptionResult {

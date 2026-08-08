@@ -19,7 +19,7 @@ import com.saarthi.agent.RouterDecision
 import com.saarthi.chat.BlockCause
 import com.saarthi.perception.SaarthiAccessibilityService
 import com.saarthi.speech.AudioRecorder
-import com.saarthi.speech.SarvamTts
+import com.saarthi.speech.MayaTts
 import com.saarthi.speech.SpeechToText
 import com.saarthi.speech.TranscriptionResult
 import com.saarthi.speech.VoicePreferences
@@ -192,7 +192,7 @@ class AssistActivity : ComponentActivity() {
                 is RouterDecision.Chat -> {
                     voiceState = VoiceState.Speaking
                     narrationLine = decision.reply
-                    SarvamTts.speak(decision.reply, settings)
+                    MayaTts.speak(decision.reply, settings)
                     onStopRequested()
                 }
                 is RouterDecision.Task -> runTask(service, decision.task, settings)
@@ -213,7 +213,7 @@ class AssistActivity : ComponentActivity() {
                 task = task,
                 languageDisplayName = settings.language.displayName,
                 narrateEveryStep = settings.narrateEveryStep,
-                speak = { text -> SarvamTts.speak(text, settings) },
+                speak = { text -> MayaTts.speak(text, settings) },
                 onEvent = { event -> handleAgentEvent(event) },
             )
         }

@@ -12,7 +12,7 @@ import com.saarthi.agent.ChatRouter
 import com.saarthi.agent.ClaudeClient
 import com.saarthi.agent.ClaudeDecision
 import com.saarthi.speech.AudioRecorder
-import com.saarthi.speech.SarvamTts
+import com.saarthi.speech.MayaTts
 import com.saarthi.speech.SpeechToText
 import com.saarthi.speech.TranscriptionResult
 import com.saarthi.speech.VoicePreferences
@@ -181,7 +181,7 @@ class DebugActionReceiver(private val service: SaarthiAccessibilityService) : Br
                         narrateEveryStep = voiceSettings.narrateEveryStep,
                         speak = { text ->
                             Log.i(TAG, "SPEAK: $text")
-                            SarvamTts.speak(text, voiceSettings)
+                            MayaTts.speak(text, voiceSettings)
                         },
                         onEvent = { event -> Log.i(TAG, "EVENT: $event") },
                     )

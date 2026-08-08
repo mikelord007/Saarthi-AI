@@ -47,7 +47,7 @@ object AgentLoop {
      * @param narrateEveryStep Gates only per-step "say" narration; terminal
      *   outcomes (done/ask_user/model-declared blocked/answer/error)
      *   always speak regardless of this flag.
-     * @param speak Wired to [com.saarthi.speech.SarvamTts] by every real
+     * @param speak Wired to [com.saarthi.speech.MayaTts] by every real
      *   caller; defaults to a no-op so this loop is fully testable without
      *   TTS.
      * @param onEvent Called once per step, plus exactly once more with a

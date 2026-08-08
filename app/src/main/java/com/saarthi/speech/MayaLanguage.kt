@@ -7,12 +7,13 @@ package com.saarthi.speech
  * ISO 639-1 for Odia is `or`, and Maya, like most providers, expects the
  * ISO code — a naive slice would silently send the wrong language code.
  *
- * VERIFY AT IMPLEMENTATION TIME: this table was written from ISO 639-1
- * without live access to Maya's current supported-language list — check
- * each of these 11 codes against Maya's docs
- * (https://docs.mayaresearch.ai/reference/languages) before shipping.
- * Anything Maya doesn't actually support should fall back to [FALLBACK]
- * (English) with a spoken notice, never a silent wrong-language request.
+ * Verified against Maya's docs (https://docs.mayaresearch.ai/reference/languages,
+ * checked 2026-08-08): Maya supports exactly these 11 languages, and
+ * Sarvam's STT (the app's other provider) supports a superset that
+ * includes all 11 of the app's codes too — so [SupportedLanguages.ALL]
+ * is already the full Maya/Sarvam intersection; nothing to trim.
+ * [FALLBACK] (English) stays as a defensive default, never expected to
+ * actually trigger.
  */
 object MayaLanguage {
 

@@ -32,10 +32,9 @@ import okhttp3.WebSocketListener
 
 private const val TAG = "SaarthiAgent"
 
-// "https", not "wss" - see SarvamTts's SARVAM_TTS_WS_URL doc for why:
-// HttpUrl.toHttpUrl() (used below to add query params) only accepts
-// http/https, and the scheme label doesn't affect the wire protocol once
-// the WebSocket Upgrade handshake happens.
+// "https", not "wss": HttpUrl.toHttpUrl() (used below to add query
+// params) only accepts http/https, and the scheme label doesn't affect
+// the wire protocol once the WebSocket Upgrade handshake happens.
 private const val SARVAM_STT_WS_URL = "https://api.sarvam.ai/speech-to-text-realtime/ws"
 
 /** The only value Sarvam's realtime endpoint accepts as of writing — not a choice, kept as a named constant for clarity/pinning. */

@@ -95,7 +95,7 @@
     <!-- Onboarding: Voice -->
     <string name="voice_screen_title">Whose voice should I use?</string>
     <string name="voice_screen_body">Tap one to hear it read a line back to you.</string>
-    <string name="onboarding_voice_sample_line">I found Ola. Opening it now.</string>
+    <string name="onboarding_voice_sample_line">Hi, I\'m Saarthi, your assistant.</string>
     <string name="use_this_voice">Use this voice</string>
 
     <!-- Onboarding: Mic -->

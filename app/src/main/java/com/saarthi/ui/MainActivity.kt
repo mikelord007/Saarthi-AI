@@ -29,7 +29,7 @@ import com.saarthi.chat.ChatTurn
 import com.saarthi.perception.SaarthiAccessibilityService
 import com.saarthi.speech.Language
 import com.saarthi.speech.SarvamStreamingStt
-import com.saarthi.speech.SarvamTts
+import com.saarthi.speech.MayaTts
 import com.saarthi.speech.Speaker
 import com.saarthi.speech.Speakers
 import com.saarthi.speech.SupportedLanguages
@@ -332,7 +332,7 @@ class MainActivity : ComponentActivity() {
                 languageDisplayName = settings.language.displayName,
                 initialHistory = initialHistory,
                 narrateEveryStep = settings.narrateEveryStep,
-                speak = { text -> SarvamTts.speak(text, settings) },
+                speak = { text -> MayaTts.speak(text, settings) },
                 onEvent = { event -> handleTypedTaskEvent(entryId, event) },
             )
         }
@@ -344,7 +344,7 @@ class MainActivity : ComponentActivity() {
         val existing = chatHistoryStore.find(entryId) ?: return
         chatHistoryStore.upsert(existing.copy(turns = existing.turns + ChatTurn("assistant", reply), status = ChatStatus.DONE))
         reloadHistory()
-        SarvamTts.speak(reply, settings)
+        MayaTts.speak(reply, settings)
     }
 
     /** A short excerpt for [ChatRouter] — enough to tell "continuing this chat" from "starting fresh" without sending the whole thread. */
@@ -450,7 +450,7 @@ class MainActivity : ComponentActivity() {
     private fun onSpeakerSelected(speaker: Speaker) {
         voicePreferences.speaker = speaker
         selectedSpeaker = speaker
-        VoiceSamples.play(applicationContext, speaker)
+        lifecycleScope.launch { VoiceSamples.play(applicationContext, speaker, selectedLanguage) }
     }
 
     private fun onNarrateToggle(value: Boolean) {
