@@ -62,6 +62,29 @@ object AgentLoop {
         speak: suspend (String) -> Unit = {},
         onEvent: suspend (AgentEvent) -> Unit,
     ) {
+        // Glow spans the whole run, not just the dispatch/execute branch
+        // below — it's the "Saarthi is working" signal, which is just as
+        // true while waiting on Claude's decision as while tapping. In a
+        // finally so every return path (all the early returns below, a
+        // thrown exception, or falling through the step budget) turns it
+        // back off.
+        service.showTaskGlow()
+        try {
+            runSteps(service, task, languageDisplayName, initialHistory, narrateEveryStep, speak, onEvent)
+        } finally {
+            service.hideTaskGlow()
+        }
+    }
+
+    private suspend fun runSteps(
+        service: SaarthiAccessibilityService,
+        task: String,
+        languageDisplayName: String,
+        initialHistory: List<String>,
+        narrateEveryStep: Boolean,
+        speak: suspend (String) -> Unit,
+        onEvent: suspend (AgentEvent) -> Unit,
+    ) {
         val history = initialHistory.toMutableList()
         val systemPrompt = AgentPrompt.system(languageDisplayName)
         var previousSerialized: String? = null

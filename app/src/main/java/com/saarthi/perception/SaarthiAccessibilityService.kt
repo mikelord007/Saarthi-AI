@@ -2,10 +2,13 @@ package com.saarthi.perception
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.graphics.PixelFormat
 import android.os.SystemClock
 import android.util.Log
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import com.saarthi.BuildConfig
+import com.saarthi.ui.TaskGlowBorderView
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +65,11 @@ class SaarthiAccessibilityService : AccessibilityService() {
 
     private var debugActionReceiver: DebugActionReceiver? = null
 
+    // The pulsing gold border shown for the duration of a running task —
+    // see [TaskGlowBorderView]. At most one at a time; [showTaskGlow] is
+    // idempotent so callers never need to track whether it's already up.
+    private var taskGlowView: TaskGlowBorderView? = null
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
@@ -91,6 +99,7 @@ class SaarthiAccessibilityService : AccessibilityService() {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
+        hideTaskGlow()
         debugActionReceiver?.unregister(this)
         agentScope.cancel()
         instance = null
@@ -98,10 +107,46 @@ class SaarthiAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        hideTaskGlow()
         debugActionReceiver?.unregister(this)
         if (::agentScope.isInitialized) agentScope.cancel()
         instance = null
         super.onDestroy()
+    }
+
+    /**
+     * Adds [TaskGlowBorderView] as a `TYPE_ACCESSIBILITY_OVERLAY` window —
+     * the type an accessibility service is granted implicitly by its
+     * binding, no `SYSTEM_ALERT_WINDOW` permission required. Non-touchable
+     * and non-focusable so it never intercepts the taps/gestures
+     * [ActionExecutor] performs on the app underneath. Safe to call more
+     * than once; a second call while the glow is already up is a no-op
+     * rather than stacking a duplicate view.
+     */
+    fun showTaskGlow() {
+        if (taskGlowView != null) return
+        val windowManager = getSystemService(WindowManager::class.java) ?: return
+        val view = TaskGlowBorderView(this)
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT,
+        )
+        runCatching { windowManager.addView(view, params) }
+            .onSuccess { taskGlowView = view }
+            .onFailure { Log.w(TAG, "Failed to add task-glow overlay", it) }
+    }
+
+    /** Removes the glow added by [showTaskGlow]. A no-op if it isn't showing. */
+    fun hideTaskGlow() {
+        val view = taskGlowView ?: return
+        taskGlowView = null
+        val windowManager = getSystemService(WindowManager::class.java) ?: return
+        runCatching { windowManager.removeView(view) }
     }
 
     /**

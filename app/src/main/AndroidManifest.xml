@@ -76,8 +76,9 @@
           Reads the foreground app's screen for the task agent and performs
           taps/scrolls/typing on the user's behalf. See
           perception.SaarthiAccessibilityService's doc for the perception +
-          execution design. No SYSTEM_ALERT_WINDOW needed — this service
-          never shows its own overlay.
+          execution design. No SYSTEM_ALERT_WINDOW needed — the task-glow
+          overlay it shows while a task runs uses TYPE_ACCESSIBILITY_OVERLAY,
+          which a bound accessibility service is granted implicitly.
         -->
         <service
             android:name=".perception.SaarthiAccessibilityService"

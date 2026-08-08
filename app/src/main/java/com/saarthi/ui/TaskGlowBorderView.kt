@@ -10,12 +10,12 @@ import android.view.View
 import android.view.animation.LinearInterpolator
 
 /**
- * Golden pulsing border meant to be shown for the duration of a running
- * task, drawn as a plain Android [View] so it can live in a window outside
- * any Activity (an overlay survives the host Activity backgrounding, which
- * matters once a task can navigate across apps). Not wired to anything yet
- * — this is available for whichever surface ends up running tasks step by
- * step to show while it works.
+ * Golden pulsing border shown for the duration of a running task, drawn as
+ * a plain Android [View] so it can live in a window outside any Activity
+ * (an overlay survives the host Activity backgrounding, which matters once
+ * a task can navigate across apps). Added/removed by
+ * [com.saarthi.perception.SaarthiAccessibilityService.showTaskGlow]/`hideTaskGlow`,
+ * which [com.saarthi.agent.AgentLoop.run] brackets its whole run with.
  *
  * Non-interactive by construction — it only ever draws.
  */
