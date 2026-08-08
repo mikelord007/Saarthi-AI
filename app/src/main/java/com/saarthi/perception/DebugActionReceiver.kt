@@ -6,6 +6,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.saarthi.agent.AgentLoop
+import com.saarthi.agent.AgentPrompt
+import com.saarthi.agent.ClaudeClient
+import com.saarthi.agent.ClaudeDecision
 import kotlinx.coroutines.launch
 
 private const val TAG = "SaarthiDebugAction"
@@ -17,15 +21,17 @@ private const val ACTION_SCROLL = "com.saarthi.debug.SCROLL"
 private const val ACTION_KEYBOARD_ENTER = "com.saarthi.debug.KEYBOARD_ENTER"
 private const val ACTION_BACK = "com.saarthi.debug.BACK"
 private const val ACTION_HOME = "com.saarthi.debug.HOME"
+private const val ACTION_DECIDE = "com.saarthi.debug.DECIDE"
+private const val ACTION_RUN_TASK = "com.saarthi.debug.RUN_TASK"
 
 /**
- * Debug-build-only broadcast receiver that drives the perception layer and
- * [ActionExecutor] (and, once stage 5 lands, the full agent loop) straight
- * from `adb shell am broadcast` — no LLM call needed to exercise most of
- * the feature, so most of it can be tested without spending on
- * Claude/Maya/Sarvam. Registered/unregistered from
- * [SaarthiAccessibilityService]'s own lifecycle; never present in a
- * release build (see the `BuildConfig.DEBUG` guard at the call site).
+ * Debug-build-only broadcast receiver that drives the perception layer,
+ * [ActionExecutor], a single Claude decision, or a full [AgentLoop] run
+ * straight from `adb shell am broadcast` — most of the feature is testable
+ * without spending on Claude/Maya/Sarvam, and RUN_TASK is one real call
+ * per step. Registered/unregistered from [SaarthiAccessibilityService]'s
+ * own lifecycle; never present in a release build (see the
+ * `BuildConfig.DEBUG` guard at the call site).
  *
  * Broadcast [ACTION_PERCEIVE] first to see the current refs in logcat,
  * then reference one in a follow-up action broadcast — refs are only
@@ -40,6 +46,8 @@ private const val ACTION_HOME = "com.saarthi.debug.HOME"
  *     adb shell am broadcast -a com.saarthi.debug.KEYBOARD_ENTER
  *     adb shell am broadcast -a com.saarthi.debug.BACK
  *     adb shell am broadcast -a com.saarthi.debug.HOME
+ *     adb shell am broadcast -a com.saarthi.debug.DECIDE --es task "search for biryani on swiggy"
+ *     adb shell am broadcast -a com.saarthi.debug.RUN_TASK --es task "search for biryani on swiggy"
  */
 class DebugActionReceiver(private val service: SaarthiAccessibilityService) : BroadcastReceiver() {
 
@@ -56,6 +64,8 @@ class DebugActionReceiver(private val service: SaarthiAccessibilityService) : Br
             addAction(ACTION_KEYBOARD_ENTER)
             addAction(ACTION_BACK)
             addAction(ACTION_HOME)
+            addAction(ACTION_DECIDE)
+            addAction(ACTION_RUN_TASK)
         }
         ContextCompat.registerReceiver(context, this, filter, ContextCompat.RECEIVER_EXPORTED)
     }
@@ -104,6 +114,39 @@ class DebugActionReceiver(private val service: SaarthiAccessibilityService) : Br
             }
             ACTION_BACK -> service.agentScope.launch { logResult("BACK", ActionExecutor.back(service)) }
             ACTION_HOME -> service.agentScope.launch { logResult("HOME", ActionExecutor.home(service)) }
+            ACTION_DECIDE -> withPerception { perception ->
+                val task = intent.getStringExtra("task")
+                if (task == null) {
+                    Log.w(TAG, "DECIDE requires --es task <task description>")
+                    return@withPerception
+                }
+                // English narration for this debug hook — a real run
+                // substitutes the user's actual VoicePreferences.language.
+                val system = AgentPrompt.system(languageDisplayName = "English")
+                val userMessage = AgentPrompt.userMessage(task = task, history = emptyList(), screen = perception.serialized)
+                when (val decision = ClaudeClient.decide(system, userMessage)) {
+                    is ClaudeDecision.ToolCall -> Log.i(TAG, "DECIDE -> ${decision.tool}")
+                    is ClaudeDecision.Malformed -> Log.w(TAG, "DECIDE -> malformed response (no usable tool_use block)")
+                    is ClaudeDecision.Refused -> Log.w(TAG, "DECIDE -> refused: ${decision.message}")
+                    is ClaudeDecision.Failed -> Log.e(TAG, "DECIDE -> failed: ${decision.message}")
+                }
+            }
+            ACTION_RUN_TASK -> {
+                val task = intent.getStringExtra("task")
+                if (task == null) {
+                    Log.w(TAG, "RUN_TASK requires --es task <task description>")
+                    return
+                }
+                service.agentScope.launch {
+                    AgentLoop.run(
+                        service = service,
+                        task = task,
+                        languageDisplayName = "English",
+                        speak = { text -> Log.i(TAG, "SPEAK: $text") },
+                        onEvent = { event -> Log.i(TAG, "EVENT: $event") },
+                    )
+                }
+            }
         }
     }
 
