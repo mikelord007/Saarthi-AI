@@ -165,11 +165,19 @@ class SarvamStreamingStt {
 
         webSocket = SaarthiHttp.client.newWebSocket(request, listener)
 
-        val result = withTimeoutOrNull(FINALIZE_TIMEOUT_MS) { done.await() }
-            ?: TranscriptionResult.Failed("Timed out waiting for a transcript")
-
-        teardown()
-        return result
+        // finally, not a sequential call after — if the calling coroutine
+        // is cancelled (e.g. the invoke sheet is dismissed mid-recording)
+        // while suspended on done.await(), a plain statement after this
+        // block would never run, leaking the AudioRecord/WebSocket to
+        // keep running in the background indefinitely. teardown() itself
+        // is fully synchronous (no suspending calls), so it's safe to run
+        // here even during cancellation.
+        return try {
+            withTimeoutOrNull(FINALIZE_TIMEOUT_MS) { done.await() }
+                ?: TranscriptionResult.Failed("Timed out waiting for a transcript")
+        } finally {
+            teardown()
+        }
     }
 
     /**

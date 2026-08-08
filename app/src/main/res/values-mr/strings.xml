@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Shared -->
+    <string name="back">मागे</string>
+    <string name="cd_send">पाठवा</string>
+    <string name="cd_history">इतिहास</string>
+    <string name="cd_settings">सेटिंग्ज</string>
+    <string name="cd_speak">बोला</string>
+    <string name="cd_close">बंद करा</string>
+    <string name="stop_label">थांबा</string>
+    <string name="step_of">पायरी %1$d पैकी %2$d</string>
+    <string name="continue_label">सुरू ठेवा</string>
+    <string name="not_now">आत्ता नाही</string>
+    <string name="yesterday">काल</string>
+
+    <!-- Voice-state mark labels (assist overlay, invoke sheet) -->
+    <string name="state_ready">तयार</string>
+    <string name="state_listening">ऐकत आहे</string>
+    <string name="state_thinking">विचार करत आहे</string>
+    <string name="state_speaking">बोलत आहे</string>
+    <string name="state_acting">करत आहे</string>
+
+    <!-- Home -->
+    <string name="home_title">मी आपल्यासाठी\nकाय करू?</string>
+    <string name="home_caption_listening">ऐकत आहे…</string>
+    <string name="home_caption_transcribing">लिहून घेत आहे…</string>
+    <string name="home_caption_thinking">विचार करत आहे…</string>
+    <string name="home_caption_tap_and_speak">टॅप करा आणि बोला · %1$s</string>
+    <string name="suggestion_search_weather">Chrome मध्ये हवामान शोधा</string>
+    <string name="suggestion_youtube_video">YouTube उघडून MrBeast चा व्हिडिओ प्ले करा</string>
+    <string name="suggestion_search_cricket">Chrome मध्ये क्रिकेट स्कोअर पहा</string>
+    <string name="home_text_placeholder">किंवा त्याऐवजी टाइप करा</string>
+    <string name="earlier_today">आज आधी</string>
+    <string name="all">सर्व</string>
+
+    <!-- Settings -->
+    <string name="settings_title">सेटिंग्ज</string>
+    <string name="language_section">भाषा</string>
+    <string name="settings_language_note">ॲप, बोलणे आणि ऐकणे — सर्व काही %1$s मध्ये होते.</string>
+    <string name="permissions_section">परवानग्या</string>
+    <string name="permission_accessibility">ॲक्सेसिबिलिटी सेवा</string>
+    <string name="permission_microphone">मायक्रोफोन</string>
+    <string name="permission_default_assistant">डीफॉल्ट असिस्टंट</string>
+    <string name="pill_on">चालू</string>
+    <string name="pill_off">बंद</string>
+    <string name="behavior_section">मी कसे वागतो</string>
+    <string name="toggle_narrate_title">प्रत्येक पायरी सांगा</string>
+    <string name="toggle_narrate_desc">कृती करण्यापूर्वी ती सांगतो</string>
+    <string name="toggle_handback_title">पैसे भरण्यापूर्वी नेहमी आपल्याकडे परत द्या</string>
+    <string name="toggle_handback_desc">नेहमी चालू</string>
+    <string name="toggle_speak_slowly_title">हळू बोला</string>
+    <string name="toggle_speak_slowly_desc">निम्म्या वेगाने, अधिक विराम देऊन</string>
+
+    <!-- History -->
+    <string name="history_title">इतिहास</string>
+    <string name="history_task_tag">कार्य</string>
+    <string name="note_narrated">स्क्रीन वाचून दाखवली</string>
+    <string name="note_in_progress">सुरू आहे</string>
+    <string name="note_waiting_answer">आपल्या उत्तराची वाट पाहत आहे</string>
+    <string name="note_done">पूर्ण झाले</string>
+    <string name="note_handback_at">\"%1$s\" येथे परत दिले</string>
+    <string name="note_stopped">थांबले — %1$s</string>
+    <string name="note_couldnt_finish">पूर्ण करता आले नाही — %1$s</string>
+    <string name="unknown_reason">अज्ञात कारण</string>
+    <string name="conversation_note">\"%1$s\" → %2$s</string>
+    <plurals name="steps_count">
+        <item quantity="one">%1$d पायरी</item>
+        <item quantity="other">%1$d पायऱ्या</item>
+    </plurals>
+    <plurals name="replies_count">
+        <item quantity="one">%1$d उत्तर</item>
+        <item quantity="other">%1$d उत्तरे</item>
+    </plurals>
+
+    <!-- Thread detail -->
+    <string name="conversation_title">संभाषण</string>
+    <string name="conversation_gone">हे संभाषण आता उपलब्ध नाही.</string>
+    <string name="you_label">आपण</string>
+    <string name="thread_reply_placeholder">उत्तर द्या किंवा आणखी काही सांगा</string>
+
+    <!-- Onboarding: Welcome -->
+    <string name="welcome_kicker">थांबा. मी आपल्याला सगळं समजावून सांगतो.</string>
+    <string name="welcome_body">आपल्याला काय करायचे आहे ते आपल्या भाषेत मला सांगा. मी स्क्रीन मोठ्याने वाचून दाखवतो, किंवा आपल्यासाठी टॅप करतो — आणि प्रत्येक पायरी करण्यापूर्वी ती सांगतो.</string>
+    <string name="begin">सुरू करा</string>
+    <string name="welcome_footer">सुमारे एक मिनिट लागतो · चार परवानग्या</string>
+
+    <!-- Onboarding: Language -->
+    <string name="language_screen_title">मी कोणत्या भाषेत बोलू?</string>
+    <string name="language_screen_body">मी याच भाषेत ऐकेनही. सेटिंग्जमध्ये कधीही बदल करू शकता.</string>
+    <string name="language_screen_count" tools:ignore="PluralsCandidate">%1$d भाषा · आणखी लवकरच येत आहेत</string>
+
+    <!-- Onboarding: Voice -->
+    <string name="voice_screen_title">मी कोणाचा आवाज वापरू?</string>
+    <string name="voice_screen_body">एक निवडा, ती ओळ आपल्याला वाचून दाखवेल.</string>
+    <string name="onboarding_voice_sample_line">मला Ola सापडले. आता उघडत आहे.</string>
+    <string name="use_this_voice">हाच आवाज वापरा</string>
+
+    <!-- Onboarding: Mic -->
+    <string name="mic_screen_title">मी मायक्रोफोन वापरू का?</string>
+    <string name="mic_screen_body">फक्त आपण माझ्याशी बोलत असताना. मी पार्श्वभूमीत ऐकत नाही, आणि कार्य संपल्यानंतर काहीही रेकॉर्ड केले जात नाही.</string>
+    <string name="mic_screen_note_prefix">Android आता आपल्याला विचारेल. निवडा </string>
+    <string name="mic_screen_note_highlight">\"ॲप वापरताना\".</string>
+    <string name="allow_microphone">मायक्रोफोनला परवानगी द्या</string>
+
+    <!-- Onboarding: Accessibility -->
+    <string name="a11y_screen_title">मला स्क्रीन वाचू द्या</string>
+    <string name="a11y_screen_body">ही एक ॲक्सेसिबिलिटी सेवा आहे. ती फक्त आपल्या स्क्रीनवरील लेबल्स वाचते — कधीही चित्रे नाही, कधीही आपला कीबोर्ड नाही.</string>
+    <string name="a11y_row_1">बटण आणि मजकूर लेबल्स वाचते</string>
+    <string name="a11y_row_2">आपल्या वतीने टॅप आणि टाइप करते</string>
+    <string name="a11y_row_3">कधीही स्क्रीनशॉट किंवा फोटो घेत नाही</string>
+    <string name="open_android_settings">Android सेटिंग्ज उघडा</string>
+    <string name="a11y_settings_path">Settings → Accessibility → Saarthi AI → On</string>
+    <string name="a11y_service_label">Saarthi AI</string>
+    <string name="a11y_service_description">आपल्या स्क्रीनवरील बटण आणि मजकूर लेबल्स वाचते, आणि आपण Saarthi ला एखादे कार्य करण्यास सांगितल्यावर आपल्या वतीने टॅप किंवा टाइप करते. कधीही स्क्रीनशॉट घेत नाही किंवा आपला कीबोर्ड वाचत नाही.</string>
+    <string name="a11y_required_notice">हे करण्यासाठी मला ॲक्सेसिबिलिटी परवानगी चालू असणे आवश्यक आहे — कृपया ती सेटिंग्जमध्ये सुरू करा.</string>
+
+    <!-- Onboarding: Assistant -->
+    <string name="assistant_screen_title">माझ्यासाठी होम बटण दाबून धरा</string>
+    <string name="assistant_screen_body">Saarthi AI ला आपला असिस्टंट बनवा, म्हणजे होम बटण दीर्घकाळ दाबल्यावर, आपण जे काही करत असाल त्यावर मी येईन.</string>
+    <string name="set_as_assistant">असिस्टंट म्हणून सेट करा</string>
+
+    <!-- Onboarding: Promise -->
+    <string name="my_promise">माझे वचन</string>
+    <string name="promise_headline">मी कधीही आपले पैसे खर्च करत नाही.</string>
+    <string name="promise_body_prefix">मी ॲप्स उघडू शकतो, फॉर्म भरू शकतो आणि आपली राईड निवडू शकतो. पण कोणतेही पेमेंट, कोणतेही पाठवणे, कोणतीही पुष्टी करण्यापूर्वी — मी थांबतो, काय होणार आहे ते मोठ्याने सांगतो, आणि </string>
+    <string name="promise_body_you">आपण</string>
+    <string name="promise_body_suffix"> शेवटचा टॅप करता.</string>
+    <string name="promise_cta">मला समजले — चला सुरू करूया</string>
+
+    <!-- Hand-back -->
+    <string name="handback_kicker">मी इथे थांबत आहे</string>
+    <string name="handback_action_question">%1$s?</string>
+    <string name="handback_body">मी हे आपल्या वतीने करणार होतो. आता आपल्याला ते स्वतः पूर्ण करावे लागेल.</string>
+    <string name="handback_footer">हे आपणच करायचे आहे. मी आपल्यासाठी हे टॅप करणार नाही.</string>
+    <string name="handback_confirm_label">हो — मी स्वतः करेन</string>
+    <string name="handback_decline_label">नाही, थांबा</string>
+
+    <!-- Invoke sheet (system assistant-slot entry point) -->
+    <string name="invoke_listening_title">मी ऐकत आहे.</string>
+    <string name="invoke_listening_prompt">%1$s मध्ये आपल्याला काय हवे ते सांगा.</string>
+    <string name="invoke_read_screen_button">ही स्क्रीन मोठ्याने वाचा</string>
+    <string name="invoke_do_task_button">माझ्यासाठी एक कार्य करा</string>
+    <string name="invoke_hold_home_hint">कधीही होम बटण दाबून धरा</string>
+    <string name="invoke_heard_you">ऐकले</string>
+    <string name="invoke_heard_promise">पैसे भरण्यापूर्वी मी थांबतो — शेवटचा टॅप आपणच करता.</string>
+    <string name="invoke_confirm_button">हो, पुढे जा</string>
+    <string name="invoke_retry_button">नाही, मला पुन्हा सांगू द्या</string>
+    <string name="invoke_plan_template">मी योग्य ॲप उघडून ते पूर्ण करेन.</string>
+    <string name="invoke_read_screen_empty">या स्क्रीनवर वाचण्यासारखे काहीही सापडले नाही.</string>
+</resources>

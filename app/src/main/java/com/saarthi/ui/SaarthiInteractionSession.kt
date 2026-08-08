@@ -48,9 +48,19 @@ import com.saarthi.ui.screens.InvokeState
 import com.saarthi.ui.theme.SaarthiTheme
 import java.util.UUID
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val TAG = "SaarthiAgent"
+
+/**
+ * Paces the auto-retry in [SaarthiInteractionSession.startRecording]'s
+ * failure branch. Without this, a failure that happens before any real
+ * recording starts (e.g. no network — [SarvamStreamingStt.record] fails
+ * near-instantly) retries in a tight loop at CPU speed instead of the
+ * human pace the old record-a-file-then-upload flow had for free.
+ */
+private const val RETRY_DELAY_MS = 1500L
 
 /**
  * The live session behind [InvokeSheet]: owns the sheet's [InvokeState],
@@ -210,6 +220,7 @@ class SaarthiInteractionSession(baseContext: Context) :
                 }
                 is TranscriptionResult.Failed -> {
                     log("✖ transcription failed: ${result.message}")
+                    delay(RETRY_DELAY_MS)
                     beginListening()
                 }
             }

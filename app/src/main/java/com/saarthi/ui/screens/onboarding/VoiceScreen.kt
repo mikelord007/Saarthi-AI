@@ -35,7 +35,7 @@ import com.saarthi.ui.theme.SaarthiColors
 import com.saarthi.ui.theme.SaarthiDimens
 import com.saarthi.ui.theme.SaarthiType
 
-/** Step 2 of 6 — a voice choice. Sample playback wires up alongside the rest of the voice pipeline later. */
+/** Step 2 of 6 — a voice choice. Tapping a row selects it and plays that voice's bundled sample clip (see [onSelected]'s wiring in MainActivity). */
 @Composable
 fun VoiceScreen(
     speakers: List<Speaker>,

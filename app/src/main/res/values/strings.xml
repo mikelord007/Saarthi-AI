@@ -39,7 +39,7 @@
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="language_section">Language</string>
-    <string name="settings_language_note">Speaking and listening both use %1$s.</string>
+    <string name="settings_language_note">The app, speaking, and listening all use %1$s.</string>
     <string name="permissions_section">Permissions</string>
     <string name="permission_accessibility">Accessibility service</string>
     <string name="permission_microphone">Microphone</string>
@@ -79,6 +79,7 @@
     <string name="conversation_title">Conversation</string>
     <string name="conversation_gone">This conversation is gone.</string>
     <string name="you_label">You</string>
+    <string name="thread_reply_placeholder">Reply or ask for something else</string>
 
     <!-- Onboarding: Welcome -->
     <string name="welcome_kicker">Hold on. I\'ll walk you through.</string>

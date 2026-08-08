@@ -117,7 +117,7 @@ fun ThreadDetailScreen(
                 value = draft,
                 onValueChange = onDraftChange,
                 modifier = Modifier.weight(1f),
-                placeholder = "Reply or ask for something else",
+                placeholder = stringResource(R.string.thread_reply_placeholder),
                 enabled = !busy,
                 onSend = onSend,
             )

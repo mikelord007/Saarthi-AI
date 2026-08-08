@@ -35,6 +35,7 @@ import com.saarthi.speech.Speakers
 import com.saarthi.speech.SupportedLanguages
 import com.saarthi.speech.TranscriptionResult
 import com.saarthi.speech.VoicePreferences
+import com.saarthi.speech.VoiceSamples
 import com.saarthi.ui.screens.HistoryScreen
 import com.saarthi.ui.screens.HomeScreen
 import com.saarthi.ui.screens.SettingsScreen
@@ -449,6 +450,7 @@ class MainActivity : ComponentActivity() {
     private fun onSpeakerSelected(speaker: Speaker) {
         voicePreferences.speaker = speaker
         selectedSpeaker = speaker
+        VoiceSamples.play(applicationContext, speaker)
     }
 
     private fun onNarrateToggle(value: Boolean) {

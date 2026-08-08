@@ -1,8 +1,11 @@
 package com.saarthi.speech
 
 /**
- * A voice choice offered in onboarding/Settings. [id] is the identifier the
- * eventual voice pipeline will key off of.
+ * A voice choice offered in onboarding. [id] is a real Sarvam `bulbul:v3`
+ * speaker name (lowercase, sent as-is in the TTS `speaker` field — see
+ * [com.saarthi.speech.SarvamTts]), curated from Sarvam's published
+ * voice directory for quality (low critical-error-rate) and tone —
+ * this is not the full ~35-voice catalog, just a good spread of it.
  */
 data class Speaker(
     val id: String,
@@ -15,26 +18,32 @@ data class Speaker(
 object Speakers {
     val ALL = listOf(
         Speaker(
-            id = "meera",
-            displayName = "Meera",
-            description = "Warm, unhurried — the default",
+            id = "shubh",
+            displayName = "Shubh",
+            description = "Warm and steady — the default",
             waveformBars = listOf(12, 22, 15),
         ),
         Speaker(
-            id = "arvind",
-            displayName = "Arvind",
-            description = "Low and steady, slower pace",
+            id = "mani",
+            displayName = "Mani",
+            description = "Low and clear, slower pace",
             waveformBars = listOf(9, 26, 11),
         ),
         Speaker(
-            id = "pavithra",
-            displayName = "Pavithra",
+            id = "priya",
+            displayName = "Priya",
             description = "Bright and quick, for busy screens",
             waveformBars = listOf(16, 18, 24),
         ),
+        Speaker(
+            id = "ishita",
+            displayName = "Ishita",
+            description = "Warm and clear, a gentler pace",
+            waveformBars = listOf(14, 20, 17),
+        ),
     )
 
-    val DEFAULT = ALL.first { it.id == "meera" }
+    val DEFAULT = ALL.first { it.id == "shubh" }
 
     fun byId(id: String): Speaker = ALL.firstOrNull { it.id == id } ?: DEFAULT
 }

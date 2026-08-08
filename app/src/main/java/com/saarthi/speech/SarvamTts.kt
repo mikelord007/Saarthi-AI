@@ -44,13 +44,6 @@ private const val SARVAM_TTS_WS_URL = "https://api.sarvam.ai/text-to-speech/ws"
 /** Latest TTS model as of writing — see [com.saarthi.speech.SpeechToText]'s own `SARVAM_MODEL` doc for the matching STT pick. */
 private const val SARVAM_TTS_MODEL = "bulbul:v3"
 
-// bulbul:v3's own default voice. The app's existing Speaker picker
-// (meera/arvind/pavithra, see Speaker.kt) is unrelated UI-preference
-// metadata for v1 rather than a real voice selection — kept behind one
-// constant, same as MayaTts's MAYA_VOICE was, so wiring a real Speaker ->
-// Sarvam-voice map later is a one-file change.
-private const val SARVAM_VOICE = "shubh"
-
 private const val SAMPLE_RATE_HZ = 24000
 private const val BYTES_PER_SAMPLE = 2 // 16-bit mono PCM
 
@@ -166,7 +159,7 @@ object SarvamTts {
             "data",
             buildJsonObject {
                 put("language_code", settings.language.code)
-                put("speaker", SARVAM_VOICE)
+                put("speaker", settings.speaker.id)
                 put("model", SARVAM_TTS_MODEL)
                 put("pace", settings.pace)
                 put("speech_sample_rate", SAMPLE_RATE_HZ)
