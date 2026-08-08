@@ -27,15 +27,14 @@ private const val ANTHROPIC_VERSION = "2023-06-01"
 
 /**
  * Model for the chat-vs-task classification call only — deliberately its
- * own constant, not [ClaudeClient]'s `AGENT_MODEL`. Same family for now,
- * but this is a different workload (one call, tiny context, a trivial
- * binary decision) and may want a cheaper/faster model later without
- * touching the agent's own per-step model choice. If this is ever swapped
- * to a Haiku model, the `output_config`/`thinking` blocks in [classify]
- * must be removed first — Haiku 4.5 rejects `effort` and non-adaptive
- * `thinking` the way Sonnet 5 accepts them.
+ * own constant, not [ClaudeClient]'s `AGENT_MODEL`: this is a different
+ * workload (one call, tiny context, a trivial binary decision) that can
+ * run on a cheaper/faster model without touching the agent's own per-step
+ * model choice. Haiku 4.5, not Sonnet — no `output_config`/`thinking`
+ * blocks in [classify]'s request body: Haiku 4.5 rejects `effort` and
+ * non-adaptive `thinking` the way Sonnet 5 accepts them.
  */
-private const val ROUTER_MODEL = "claude-sonnet-5"
+private const val ROUTER_MODEL = "claude-haiku-4-5-20251001"
 private const val MAX_TOKENS = 512
 
 /**
@@ -90,8 +89,6 @@ object ChatRouter {
         val requestBody = buildJsonObject {
             put("model", ROUTER_MODEL)
             put("max_tokens", MAX_TOKENS)
-            put("thinking", buildJsonObject { put("type", "disabled") })
-            put("output_config", buildJsonObject { put("effort", "low") })
             put("system", systemPrompt(languageDisplayName))
             put(
                 "messages",
@@ -191,13 +188,15 @@ object ChatRouter {
         SYSTEM_TEMPLATE.replace("%LANGUAGE%", languageDisplayName)
 
     private val SYSTEM_TEMPLATE = """
-        You are the front door for Saarthi, a voice assistant that can either chat with the user directly, or take over their Android phone to perform a task on their behalf (open apps, tap, type, read the screen). Given the user's message, decide which this is.
+        You are the front door for Saarthi, a voice assistant that can either chat with the user directly, or take over their Android phone to perform a task on their behalf. Given the user's message, decide which this is.
 
         Call exactly one tool:
         - chat: the message is a greeting, small talk, a question about Saarthi itself, thanks, or a follow-up that needs no action on the phone. Reply naturally and briefly (one to three short sentences) in %LANGUAGE%.
         - start_task: the message asks you to open an app, find or search for something, change a setting, read the current screen, or do anything else that requires looking at or acting on the phone.
 
         When genuinely unsure which one applies, prefer start_task — a wrong "chat" call silently drops a real request, which is worse than one unnecessary task attempt.
+
+        If asked what you are, what you can do, or anything like "what are your capabilities": you're Saarthi, a voice assistant that operates the user's Android phone on their behalf, by voice or text, in their own language. Concretely you can open and search within apps, tap buttons, type into fields, scroll, check notifications, adjust quick settings (Wi-Fi, Bluetooth, flashlight, Do Not Disturb), read what's on screen aloud, and answer questions about the current screen. You never complete an irreversible action yourself — paying, sending, submitting, ordering, or confirming something — you stop and let the user do that specific tap themselves. Summarize this briefly and conversationally; don't recite it as a list unless asked for detail.
 
         RECENT, if present, is a short excerpt of the recent conversation for context. MESSAGE is the new thing the user just said.
     """.trimIndent()

@@ -122,11 +122,11 @@ fun HomeScreen(
 
             // Stacked here to avoid pulling in the experimental FlowRow API for three fixed strings.
             val searchWeather = stringResource(R.string.suggestion_search_weather)
-            val readScreen = stringResource(R.string.suggestion_read_screen)
+            val youtubeVideo = stringResource(R.string.suggestion_youtube_video)
             val searchCricket = stringResource(R.string.suggestion_search_cricket)
             SuggestionChip(text = searchWeather, onClick = { onSuggestionTap(searchWeather) })
             Spacer(Modifier.height(8.dp))
-            SuggestionChip(text = readScreen, onClick = { onSuggestionTap(readScreen) })
+            SuggestionChip(text = youtubeVideo, onClick = { onSuggestionTap(youtubeVideo) })
             Spacer(Modifier.height(8.dp))
             SuggestionChip(text = searchCricket, onClick = { onSuggestionTap(searchCricket) })
         }

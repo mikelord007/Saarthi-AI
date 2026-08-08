@@ -3,6 +3,7 @@ package com.saarthi.agent
 import com.saarthi.BuildConfig
 import com.saarthi.net.SaarthiHttp
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -33,7 +34,10 @@ private const val ANTHROPIC_VERSION = "2023-06-01"
  * otherwise later.
  */
 private const val AGENT_MODEL = "claude-sonnet-5"
-private const val MAX_TOKENS = 1024
+/** Generous headroom for adaptive thinking's own output, on top of the small tap/scroll/done tool call — a low ceiling here would truncate mid-thought and surface as [ClaudeDecision.Failed]. */
+private const val MAX_TOKENS = 4096
+/** Adaptive thinking adds latency per step; longer than [SaarthiHttp]'s default 30s read timeout so a slow thinking pass doesn't get cut off and reported as a network failure. */
+private const val READ_TIMEOUT_SECONDS = 60L
 
 /** A step decision from Claude, or a reason there isn't one — never a boolean; callers need to tell "malformed" from "refused" from "network failure". */
 sealed interface ClaudeDecision {
@@ -54,14 +58,16 @@ object ClaudeClient {
         val requestBody = buildJsonObject {
             put("model", AGENT_MODEL)
             put("max_tokens", MAX_TOKENS)
-            // Adaptive thinking is ON by default on Sonnet 5 when `thinking`
-            // is omitted — a silent default change from Sonnet 4.6/Opus
-            // 4.8. Disabling it explicitly keeps this a fast, cheap
-            // per-step decision instead of spending part of max_tokens on
-            // unrequested reasoning. No temperature/top_p/top_k — Sonnet 5
-            // rejects them at non-default values.
-            put("thinking", buildJsonObject { put("type", "disabled") })
-            put("output_config", buildJsonObject { put("effort", "low") })
+            // Adaptive thinking + high effort together is the combination
+            // Anthropic's own guidance calls out as best for computer-use/
+            // agentic tool-selection accuracy — exactly this call's job.
+            // No budget_tokens: that's the deprecated manual-thinking knob;
+            // adaptive lets Claude decide per-step whether/how much to
+            // think. No temperature/top_p/top_k — Sonnet 5 rejects them at
+            // non-default values. Forced tool_choice below stays compatible
+            // with thinking on the direct Claude API (unlike Bedrock).
+            put("thinking", buildJsonObject { put("type", "adaptive") })
+            put("output_config", buildJsonObject { put("effort", "high") })
             put("system", systemPrompt)
             put(
                 "messages",
@@ -99,8 +105,12 @@ object ClaudeClient {
             .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
+        val client = SaarthiHttp.client.newBuilder()
+            .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .build()
+
         try {
-            SaarthiHttp.client.newCall(request).execute().use { response ->
+            client.newCall(request).execute().use { response ->
                 val rawBody = response.body?.string()
                 if (!response.isSuccessful || rawBody == null) {
                     ClaudeDecision.Failed("Claude request failed: HTTP ${response.code} ${rawBody.orEmpty()}")

@@ -30,7 +30,7 @@
     <string name="home_caption_thinking">Thinking…</string>
     <string name="home_caption_tap_and_speak">Tap and speak · %1$s</string>
     <string name="suggestion_search_weather">Search for weather in Chrome</string>
-    <string name="suggestion_read_screen">Read this screen to me</string>
+    <string name="suggestion_youtube_video">Open YouTube and play a video by MrBeast</string>
     <string name="suggestion_search_cricket">Check the cricket score in Chrome</string>
     <string name="home_text_placeholder">or type it instead</string>
     <string name="earlier_today">Earlier today</string>
