@@ -27,12 +27,11 @@ import com.saarthi.chat.ChatHistoryStore
 import com.saarthi.chat.ChatStatus
 import com.saarthi.chat.ChatTurn
 import com.saarthi.perception.SaarthiAccessibilityService
-import com.saarthi.speech.AudioRecorder
 import com.saarthi.speech.Language
+import com.saarthi.speech.SarvamStreamingStt
 import com.saarthi.speech.SarvamTts
 import com.saarthi.speech.Speaker
 import com.saarthi.speech.Speakers
-import com.saarthi.speech.SpeechToText
 import com.saarthi.speech.SupportedLanguages
 import com.saarthi.speech.TranscriptionResult
 import com.saarthi.speech.VoicePreferences
@@ -61,7 +60,7 @@ class MainActivity : ComponentActivity() {
     private val chatHistoryStore by lazy { ChatHistoryStore(applicationContext) }
     private val voicePreferences by lazy { VoicePreferences(applicationContext) }
     private val onboardingPreferences by lazy { OnboardingPreferences(applicationContext) }
-    private val audioRecorder by lazy { AudioRecorder(this) }
+    private val sarvamStreamingStt by lazy { SarvamStreamingStt() }
 
     private var entries by mutableStateOf<List<ChatEntry>>(emptyList())
     private var draft by mutableStateOf("")
@@ -404,9 +403,14 @@ class MainActivity : ComponentActivity() {
 
     // --- Voice input alternative ---
 
+    /**
+     * A second tap while recording is a manual early stop
+     * ([SarvamStreamingStt.stop]) — VAD normally finalizes on its own, so
+     * this is only needed if the user wants to cut it short.
+     */
     private fun onMicToggle() {
         if (isRecording) {
-            stopRecordingAndTranscribe()
+            sarvamStreamingStt.stop()
             return
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
@@ -419,34 +423,18 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startRecording() {
-        try {
-            audioRecorder.start()
-            isRecording = true
-        } catch (e: SecurityException) {
-            // RECORD_AUDIO not granted at runtime despite the check above
-            // (e.g. revoked between the check and this call) — stay idle
-            // rather than crash.
-        }
-    }
-
-    private fun stopRecordingAndTranscribe() {
-        isRecording = false
-        isTranscribing = true
+        isRecording = true
         val settings = voicePreferences.settings
         lifecycleScope.launch {
-            val file = audioRecorder.stop()
-            if (file == null) {
-                isTranscribing = false
-                return@launch
-            }
-            when (val result = SpeechToText.transcribe(file, settings.language)) {
-                is TranscriptionResult.Success -> {
-                    isTranscribing = false
-                    submitTask(result.transcript)
-                }
-                is TranscriptionResult.Failed -> {
-                    isTranscribing = false
-                }
+            val result = sarvamStreamingStt.record(
+                language = settings.language,
+                onSpeechEnded = { isRecording = false; isTranscribing = true },
+            )
+            isRecording = false
+            isTranscribing = false
+            when (result) {
+                is TranscriptionResult.Success -> submitTask(result.transcript)
+                is TranscriptionResult.Failed -> {}
             }
         }
     }

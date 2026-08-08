@@ -1,6 +1,8 @@
 package com.saarthi.ui
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
 import android.util.Log
@@ -10,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -36,9 +39,8 @@ import com.saarthi.chat.ChatTurn
 import com.saarthi.chat.EntryKind
 import com.saarthi.perception.SaarthiAccessibilityService
 import com.saarthi.perception.ScreenPerception
-import com.saarthi.speech.AudioRecorder
+import com.saarthi.speech.SarvamStreamingStt
 import com.saarthi.speech.SarvamTts
-import com.saarthi.speech.SpeechToText
 import com.saarthi.speech.TranscriptionResult
 import com.saarthi.speech.VoicePreferences
 import com.saarthi.ui.screens.InvokeSheet
@@ -95,7 +97,7 @@ class SaarthiInteractionSession(baseContext: Context) :
 
     private val voicePreferences by lazy { VoicePreferences(context) }
     private val chatHistoryStore by lazy { ChatHistoryStore(context) }
-    private val audioRecorder by lazy { AudioRecorder(context) }
+    private val sarvamStreamingStt by lazy { SarvamStreamingStt() }
 
     /** Read fresh every use — the user may change language in Settings between invocations. */
     private val voice get() = voicePreferences.settings
@@ -178,36 +180,30 @@ class SaarthiInteractionSession(baseContext: Context) :
         startRecording()
     }
 
+    /** A tap while recording is a manual early stop — VAD normally finalizes on its own; see [SarvamStreamingStt.stop]'s own doc. */
     private fun toggleRecording() {
         log("toggleRecording (isRecording=$isRecording)")
-        if (isRecording) stopRecordingAndTranscribe() else startRecording()
+        if (isRecording) sarvamStreamingStt.stop() else startRecording()
     }
 
     private fun startRecording() {
-        try {
-            audioRecorder.start()
-            isRecording = true
-            log("recording started")
-        } catch (e: SecurityException) {
-            // RECORD_AUDIO not granted at runtime — onboarding/Settings is
-            // responsible for that before this surface is reachable; stay
-            // in Listening rather than crash.
-            log("✖ RECORD_AUDIO not granted: ${e.message}")
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            // Onboarding/Settings is responsible for granting this before
+            // this surface is reachable — stay in Listening rather than
+            // retry-loop against a permission that isn't coming.
+            log("✖ RECORD_AUDIO not granted")
+            return
         }
-    }
-
-    private fun stopRecordingAndTranscribe() {
-        isRecording = false
+        isRecording = true
+        log("recording started")
         val settings = voice
         lifecycleScope.launch {
-            val file = audioRecorder.stop()
-            if (file == null) {
-                log("✖ stop() returned no file — nothing was recorded")
-                beginListening()
-                return@launch
-            }
-            log("recorded ${file.length()} bytes, uploading to Sarvam (language=${settings.language.code})")
-            when (val result = SpeechToText.transcribe(file, settings.language)) {
+            val result = sarvamStreamingStt.record(
+                language = settings.language,
+                onSpeechEnded = { log("speech ended, finalizing") },
+            )
+            isRecording = false
+            when (result) {
                 is TranscriptionResult.Success -> {
                     log("transcript: \"${result.transcript}\"")
                     onTranscript(result.transcript, settings)
