@@ -154,7 +154,6 @@ class MainActivity : ComponentActivity() {
                         onSuggestionTap = ::submitTask,
                         onSend = ::onSend,
                         onOpenHistory = { nav.go(Screen.History) },
-                        onOpenThread = { chatId -> threadDraft = ""; nav.go(Screen.ThreadDetail(chatId)) },
                         onOpenSettings = { nav.go(Screen.Settings) },
                     )
 

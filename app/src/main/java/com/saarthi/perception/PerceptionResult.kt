@@ -19,11 +19,20 @@ import android.view.accessibility.AccessibilityNodeInfo
  * diffed/cached across passes — a stale [AccessibilityNodeInfo] crashes or
  * silently no-ops. [stale] distinguishes a genuine fresh read from a
  * timed-out traversal that fell back to the last good snapshot.
+ *
+ * [hasActionableElement] is separate from [isEmpty] — a transitional
+ * screen caught mid-animation (e.g. only the status bar's own icons) can
+ * have several kept nodes and so not be [isEmpty], while still having
+ * nothing clickable/editable/scrollable/checkable on it at all. Defaults
+ * to `false` so the empty-fallback constructions elsewhere in
+ * [ScreenPerception] don't need to say so explicitly; [ScreenPerception]'s
+ * real serialization path computes and passes the true value.
  */
 data class PerceptionResult(
     val serialized: String,
     internal val refMap: Map<String, AccessibilityNodeInfo>,
     val stale: Boolean = false,
+    val hasActionableElement: Boolean = false,
 ) {
     val isEmpty: Boolean get() = refMap.isEmpty()
 }

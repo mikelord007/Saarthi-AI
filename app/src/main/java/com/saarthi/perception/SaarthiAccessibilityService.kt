@@ -2,6 +2,7 @@ package com.saarthi.perception
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.os.SystemClock
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.saarthi.BuildConfig
@@ -105,14 +106,49 @@ class SaarthiAccessibilityService : AccessibilityService() {
 
     /**
      * Suspends until a [AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED]
-     * fires or [timeoutMs] elapses, whichever first. Every action in
-     * [com.saarthi.perception.ActionExecutor] calls this after performing
-     * an action — never re-perceive immediately after acting.
+     * fires or [timeoutMs] elapses, whichever first. A single-shot wait —
+     * [AgentLoop][com.saarthi.agent.AgentLoop]'s empty-screen retry uses
+     * this directly (it already loops the full capture externally); for
+     * waiting out a single action's aftermath, use [awaitSettled] instead.
      */
     suspend fun awaitContentChanged(timeoutMs: Long) {
+        awaitContentChangedEvent(timeoutMs)
+    }
+
+    /**
+     * Waits for on-screen content to actually finish changing, not just
+     * start changing. A single content-changed event can fire for the very
+     * start of a transition (the outgoing screen beginning to animate
+     * away, or a status-bar icon refreshing) well before the destination
+     * screen has finished laying out — a capture taken right after that
+     * first event can catch a near-empty transitional state (confirmed on
+     * a real device: tapping into a Settings sub-screen sometimes read
+     * back only the status bar's own icons, no real content, when the
+     * capture followed the very first change event by under 200ms).
+     * Waits for [quietMs] with no further events before returning, bounded
+     * overall by [maxTotalMs] so a screen that only ever sends one event
+     * still returns promptly. Every [ActionExecutor] action calls this
+     * after performing itself — never re-perceive immediately after
+     * acting.
+     */
+    suspend fun awaitSettled(quietMs: Long = 250L, maxTotalMs: Long = 1500L) {
+        val deadline = SystemClock.elapsedRealtime() + maxTotalMs
+        var sawChange = false
+        while (true) {
+            val remaining = deadline - SystemClock.elapsedRealtime()
+            if (remaining <= 0) return
+            val window = if (sawChange) minOf(quietMs, remaining) else remaining
+            val fired = awaitContentChangedEvent(window)
+            if (!fired) return
+            sawChange = true
+        }
+    }
+
+    private suspend fun awaitContentChangedEvent(timeoutMs: Long): Boolean {
         val waiter = CompletableDeferred<Unit>()
         contentChangedWaiters += waiter
-        withTimeoutOrNull(timeoutMs) { waiter.await() }
+        val result = withTimeoutOrNull(timeoutMs) { waiter.await() }
         contentChangedWaiters.remove(waiter)
+        return result != null
     }
 }

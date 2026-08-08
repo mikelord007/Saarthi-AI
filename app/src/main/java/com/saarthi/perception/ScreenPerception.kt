@@ -311,9 +311,11 @@ object ScreenPerception {
     private fun serialize(nodes: List<KeptNode>): PerceptionResult {
         val refMap = mutableMapOf<String, AccessibilityNodeInfo>()
         val lines = StringBuilder()
+        var hasActionableElement = false
         nodes.forEachIndexed { index, kept ->
             val ref = "e${index + 1}"
             refMap[ref] = kept.node
+            if (kept.clickable || kept.editable || kept.scrollable || kept.checkable) hasActionableElement = true
             lines.append(ref).append(' ').append(kept.className)
             kept.label?.let { label ->
                 val truncated = if (label.length > MAX_LABEL_LENGTH) label.take(MAX_LABEL_LENGTH - 1) + "…" else label
@@ -327,6 +329,6 @@ object ScreenPerception {
             kept.boundsCenter?.let { lines.append(" bounds=[").append(it.x).append(',').append(it.y).append(']') }
             lines.append('\n')
         }
-        return PerceptionResult(serialized = lines.toString().trimEnd('\n'), refMap = refMap)
+        return PerceptionResult(serialized = lines.toString().trimEnd('\n'), refMap = refMap, hasActionableElement = hasActionableElement)
     }
 }

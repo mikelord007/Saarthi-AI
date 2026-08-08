@@ -3,6 +3,18 @@
   See perception.SaarthiAccessibilityService's doc for why each flag is here.
   serviceInfo is deliberately NOT overridden in code — this file is the
   single source of truth for the service's configuration.
+
+  isAccessibilityTool="true" is required, not optional: Android (from
+  accessibilityDataSensitive, Settings marking its own network/Wi-Fi
+  panel as sensitive) withholds sensitive view content entirely from any
+  AccessibilityService that hasn't declared this — confirmed on-device
+  (both emulator and a real Pixel) that Settings' Wi-Fi toggle screen
+  read back as completely empty without it, no matter how long perception
+  waited or retried. Legitimate here, not a policy workaround: Saarthi
+  genuinely is an assistive screen-reading/automation tool for the user,
+  which is exactly what this flag exists to identify. Google Play
+  independently verifies this claim and rejects/blocks apps that set it
+  falsely.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowContentChanged|typeWindowStateChanged"
@@ -11,4 +23,5 @@
     android:canPerformGestures="true"
     android:canRetrieveWindowContent="true"
     android:description="@string/a11y_service_description"
+    android:isAccessibilityTool="true"
     android:notificationTimeout="100" />

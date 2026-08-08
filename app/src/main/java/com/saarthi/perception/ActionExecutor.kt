@@ -18,7 +18,6 @@ private const val LONG_PRESS_DURATION_MS = 600L
 private const val DEFAULT_SWIPE_DURATION_MS = 300L
 private const val MIN_SWIPE_DURATION_MS = 10L
 private const val MAX_SWIPE_DURATION_MS = 5000L
-private const val SETTLE_TIMEOUT_MS = 1500L
 private const val MAX_ANCESTOR_WALK = 30
 
 enum class ScrollDirection { UP, DOWN }
@@ -35,8 +34,8 @@ sealed interface ActionResult {
  * refs are only ever valid for the capture pass that produced them; the
  * caller is always the [AgentLoop][com.saarthi.agent.AgentLoop] step that
  * just perceived. Every action awaits
- * [SaarthiAccessibilityService.awaitContentChanged] before returning —
- * never re-perceive immediately after acting.
+ * [SaarthiAccessibilityService.awaitSettled] before returning — never
+ * re-perceive immediately after acting.
  */
 object ActionExecutor {
 
@@ -67,7 +66,7 @@ object ActionExecutor {
             if (!dispatchGesture(service, gesture)) return ActionResult.Failed("tap gesture dispatch failed")
         }
 
-        service.awaitContentChanged(SETTLE_TIMEOUT_MS)
+        service.awaitSettled()
         return ActionResult.Success
     }
 
@@ -90,7 +89,7 @@ object ActionExecutor {
             if (!dispatchGesture(service, gesture)) return ActionResult.Failed("long-press gesture dispatch failed")
         }
 
-        service.awaitContentChanged(SETTLE_TIMEOUT_MS)
+        service.awaitSettled()
         return ActionResult.Success
     }
 
@@ -136,7 +135,7 @@ object ActionExecutor {
 
         runCatching { node.refresh() }
         if (runCatching { node.text?.toString() }.getOrNull() == text) {
-            service.awaitContentChanged(SETTLE_TIMEOUT_MS)
+            service.awaitSettled()
             return ActionResult.Success
         }
 
@@ -147,7 +146,7 @@ object ActionExecutor {
         runCatching { node.refresh() }
         val afterPaste = runCatching { node.text?.toString() }.getOrNull()
 
-        service.awaitContentChanged(SETTLE_TIMEOUT_MS)
+        service.awaitSettled()
         return if (pasted && afterPaste == text) {
             ActionResult.Success
         } else {
@@ -191,7 +190,7 @@ object ActionExecutor {
             if (!dispatchGesture(service, gesture)) return ActionResult.Failed("scroll swipe dispatch failed")
         }
 
-        service.awaitContentChanged(SETTLE_TIMEOUT_MS)
+        service.awaitSettled()
         return ActionResult.Success
     }
 
@@ -216,19 +215,19 @@ object ActionExecutor {
             if (!injected) return ActionResult.Failed("could not submit the focused field")
         }
 
-        service.awaitContentChanged(SETTLE_TIMEOUT_MS)
+        service.awaitSettled()
         return ActionResult.Success
     }
 
     suspend fun back(service: SaarthiAccessibilityService): ActionResult {
         service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-        service.awaitContentChanged(SETTLE_TIMEOUT_MS)
+        service.awaitSettled()
         return ActionResult.Success
     }
 
     suspend fun home(service: SaarthiAccessibilityService): ActionResult {
         service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
-        service.awaitContentChanged(SETTLE_TIMEOUT_MS)
+        service.awaitSettled()
         return ActionResult.Success
     }
 

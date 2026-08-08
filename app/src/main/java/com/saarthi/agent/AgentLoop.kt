@@ -1,13 +1,17 @@
 package com.saarthi.agent
 
+import android.util.Log
+import com.saarthi.BuildConfig
 import com.saarthi.chat.BlockCause
 import com.saarthi.perception.ActionExecutor
 import com.saarthi.perception.ActionResult
+import com.saarthi.perception.PerceptionResult
 import com.saarthi.perception.ScreenPerception
 import com.saarthi.perception.ScrollDirection
 import com.saarthi.perception.SaarthiAccessibilityService
 import kotlinx.coroutines.launch
 
+private const val TAG = "SaarthiAgent"
 private const val MAX_STEPS = 20
 private const val MAX_NO_PROGRESS_STREAK = 3
 private const val MAX_MALFORMED_RETRIES = 2
@@ -64,14 +68,24 @@ object AgentLoop {
         var noProgressStreak = 0
         var stepIndex = 1
 
+        log("▶ TASK: \"$task\" (lang=$languageDisplayName${if (initialHistory.isNotEmpty()) ", resuming ${initialHistory.size} history lines" else ""})")
+
         while (stepIndex <= MAX_STEPS) {
+            log("[Step $stepIndex] Capturing screen…")
             var perception = ScreenPerception.capture(service, goHomeIfEmpty = stepIndex == 1)
 
-            // Empty-screen retry for steps after the first — a blank read
-            // is treated as "app mid-launch/splash", not a dead end.
-            if (perception.isEmpty && stepIndex > 1) {
+            // Empty/non-actionable-screen retry for steps after the first —
+            // a blank read, or a read with nothing actionable on it at
+            // all, is treated as "app mid-transition," not a dead end. The
+            // non-actionable case specifically catches a transitional
+            // frame with a few decorative nodes but no real content (e.g.
+            // only the status bar's own icons) slipping through despite
+            // ActionExecutor's own settle wait.
+            fun needsRetry(p: PerceptionResult) = p.isEmpty || !p.hasActionableElement
+            if (needsRetry(perception) && stepIndex > 1) {
                 var attempt = 0
-                while (perception.isEmpty && attempt < EMPTY_SCREEN_RETRIES) {
+                while (needsRetry(perception) && attempt < EMPTY_SCREEN_RETRIES) {
+                    log("[Step $stepIndex] Screen has nothing actionable yet (attempt ${attempt + 1}/$EMPTY_SCREEN_RETRIES) — waiting for it to settle…")
                     service.awaitContentChanged(EMPTY_SCREEN_RETRY_WAIT_MS)
                     perception = ScreenPerception.capture(service, goHomeIfEmpty = false)
                     attempt++
@@ -80,10 +94,13 @@ object AgentLoop {
 
             if (perception.isEmpty) {
                 val message = "I couldn't read the screen — the app may not have finished loading."
+                log("[Step $stepIndex] ✖ Screen empty after retries — $message")
                 speak(message)
                 onEvent(AgentEvent.Error(message))
                 return
             }
+
+            log("[Step $stepIndex] Screen (stale=${perception.stale}):\n${perception.serialized}")
 
             // No-progress circuit breaker: a weak model will happily keep
             // scrolling/tapping a dead end. Compared byte-for-byte against
@@ -98,6 +115,7 @@ object AgentLoop {
                 }
                 if (noProgressStreak >= MAX_NO_PROGRESS_STREAK) {
                     val reason = "The screen stopped responding to my actions."
+                    log("[Step $stepIndex] ✖ No-progress circuit breaker tripped ($noProgressStreak identical screens in a row)")
                     speak(reason)
                     onEvent(AgentEvent.Blocked(reason = reason, cause = BlockCause.NO_PROGRESS))
                     return
@@ -109,6 +127,7 @@ object AgentLoop {
 
             if (LoginWallDetector.isLoginWall(perception)) {
                 val question = "This looks like a login, password, or verification screen — please handle it yourself, then tell me to continue."
+                log("[Step $stepIndex] ✖ Login-wall detected — stopping before asking Claude")
                 speak(question)
                 onEvent(AgentEvent.AskUser(question = question, history = history.toList()))
                 return
@@ -124,10 +143,15 @@ object AgentLoop {
                     hint?.let { "$base\n\n$it" } ?: base
                 }
 
+                log("[Step $stepIndex] Asking Claude…")
                 when (val decision = ClaudeClient.decide(systemPrompt, userMessage)) {
-                    is ClaudeDecision.ToolCall -> tool = decision.tool
+                    is ClaudeDecision.ToolCall -> {
+                        log("[Step $stepIndex] Claude → ${decision.tool}")
+                        tool = decision.tool
+                    }
                     is ClaudeDecision.Malformed -> {
                         malformedAttempts++
+                        log("[Step $stepIndex] Claude → malformed response (attempt $malformedAttempts/$MAX_MALFORMED_RETRIES)")
                         if (malformedAttempts > MAX_MALFORMED_RETRIES) {
                             val reason = "I couldn't understand how to proceed."
                             speak(reason)
@@ -137,12 +161,14 @@ object AgentLoop {
                         hint = MALFORMED_HINT
                     }
                     is ClaudeDecision.Refused -> {
+                        log("[Step $stepIndex] Claude → refused: ${decision.message}")
                         val reason = "I'm not able to help with that step."
                         speak(reason)
                         onEvent(AgentEvent.Error(reason))
                         return
                     }
                     is ClaudeDecision.Failed -> {
+                        log("[Step $stepIndex] Claude → failed: ${decision.message}")
                         val message = "Something went wrong talking to the assistant."
                         speak(message)
                         onEvent(AgentEvent.Error(message))
@@ -154,18 +180,21 @@ object AgentLoop {
             // ---- dispatch ----
             when (val decided = tool) {
                 is AgentTool.Done -> {
+                    log("✔ TASK DONE: ${decided.summary}")
                     history += "Step $stepIndex: done -> ${decided.summary}"
                     speak(decided.summary)
                     onEvent(AgentEvent.Done(decided.summary))
                     return
                 }
                 is AgentTool.AskUser -> {
+                    log("? TASK PAUSED (ask_user): ${decided.question}")
                     history += "Step $stepIndex: ask_user -> ${decided.question}"
                     speak(decided.question)
                     onEvent(AgentEvent.AskUser(question = decided.question, history = history.toList()))
                     return
                 }
                 is AgentTool.Blocked -> {
+                    log("✖ TASK BLOCKED (model-declared): ${decided.reason}")
                     history += "Step $stepIndex: blocked -> ${decided.reason}"
                     speak(decided.reason)
                     onEvent(AgentEvent.Blocked(reason = decided.reason, cause = BlockCause.MODEL_DECLARED))
@@ -189,9 +218,11 @@ object AgentLoop {
                     }
 
                     val result = execute(service, perception, decided)
+                    log("[Step $stepIndex] Action: ${historyDescriptor(decided)} -> ${describe(result)}")
                     history += "Step $stepIndex: ${historyDescriptor(decided)} -> ${describe(result)}"
 
                     if (result is ActionResult.Blocked) {
+                        log("✖ TASK BLOCKED (irreversible-action guard): ${result.label} (matched \"${result.matchedKeyword}\")")
                         // The irreversible-action guard fired in code,
                         // independent of what the model said it was doing.
                         // Deliberately does not speak here — the caller's
@@ -217,13 +248,19 @@ object AgentLoop {
         }
 
         val reason = "I reached my step limit without finishing this task."
+        log("✖ TASK BLOCKED: step budget ($MAX_STEPS) exhausted")
         speak(reason)
         onEvent(AgentEvent.Blocked(reason = reason, cause = BlockCause.STEP_BUDGET))
     }
 
+    /** Debug-build-only step tracing — see the class doc. Never compiled into a release build's active log output, consistent with [com.saarthi.perception.DebugActionReceiver] being debug-only. */
+    private fun log(message: String) {
+        if (BuildConfig.DEBUG) Log.d(TAG, message)
+    }
+
     private suspend fun execute(
         service: SaarthiAccessibilityService,
-        perception: com.saarthi.perception.PerceptionResult,
+        perception: PerceptionResult,
         tool: AgentTool,
     ): ActionResult = when (tool) {
         is AgentTool.Tap -> ActionExecutor.tap(service, perception, tool.ref)
