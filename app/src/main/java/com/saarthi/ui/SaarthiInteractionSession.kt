@@ -3,6 +3,7 @@ package com.saarthi.ui
 import android.content.Context
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import androidx.compose.runtime.getValue
@@ -21,6 +22,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.saarthi.BuildConfig
 import com.saarthi.R
 import com.saarthi.agent.AgentEvent
 import com.saarthi.agent.AgentLoop
@@ -45,6 +47,8 @@ import com.saarthi.ui.theme.SaarthiTheme
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+
+private const val TAG = "SaarthiAgent"
 
 /**
  * The live session behind [InvokeSheet]: owns the sheet's [InvokeState],
@@ -174,6 +178,7 @@ class SaarthiInteractionSession(baseContext: Context) :
     }
 
     private fun toggleRecording() {
+        log("toggleRecording (isRecording=$isRecording)")
         if (isRecording) stopRecordingAndTranscribe() else startRecording()
     }
 
@@ -181,10 +186,12 @@ class SaarthiInteractionSession(baseContext: Context) :
         try {
             audioRecorder.start()
             isRecording = true
+            log("recording started")
         } catch (e: SecurityException) {
             // RECORD_AUDIO not granted at runtime — onboarding/Settings is
             // responsible for that before this surface is reachable; stay
             // in Listening rather than crash.
+            log("✖ RECORD_AUDIO not granted: ${e.message}")
         }
     }
 
@@ -194,14 +201,26 @@ class SaarthiInteractionSession(baseContext: Context) :
         lifecycleScope.launch {
             val file = audioRecorder.stop()
             if (file == null) {
+                log("✖ stop() returned no file — nothing was recorded")
                 beginListening()
                 return@launch
             }
+            log("recorded ${file.length()} bytes, uploading to Sarvam (language=${settings.language.code})")
             when (val result = SpeechToText.transcribe(file, settings.language)) {
-                is TranscriptionResult.Success -> onTranscript(result.transcript, settings)
-                is TranscriptionResult.Failed -> beginListening()
+                is TranscriptionResult.Success -> {
+                    log("transcript: \"${result.transcript}\"")
+                    onTranscript(result.transcript, settings)
+                }
+                is TranscriptionResult.Failed -> {
+                    log("✖ transcription failed: ${result.message}")
+                    beginListening()
+                }
             }
         }
+    }
+
+    private fun log(message: String) {
+        if (BuildConfig.DEBUG) Log.d(TAG, "[Session] $message")
     }
 
     /**
